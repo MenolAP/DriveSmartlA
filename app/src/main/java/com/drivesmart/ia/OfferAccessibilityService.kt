@@ -14,6 +14,12 @@ import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.TextView
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.Button
+import android.text.InputType
+import android.text.TextWatcher
+import android.text.Editable
 import org.json.JSONObject
 import java.text.NumberFormat
 import java.util.Locale
@@ -33,6 +39,11 @@ class OfferAccessibilityService : AccessibilityService() {
     private var windowManager: WindowManager? = null
     private var bubble: TextView? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
+    private var kmPanel: LinearLayout? = null
+    private var kmPanelParams: WindowManager.LayoutParams? = null
+    private var emptyKmInput: EditText? = null
+    private var passengerKmInput: EditText? = null
+    private var minimumFareLabel: TextView? = null
     private var receiverRegistered = false
     private var lastSignature = ""
     private var lastDetectedAt = 0L
@@ -252,15 +263,7 @@ class OfferAccessibilityService : AccessibilityService() {
                 setStroke(dp(3), 0xFFFFC857.toInt())
             }
             elevation = dp(14).toFloat()
-            setOnClickListener {
-                val prefs = getSharedPreferences("drivesmart_history", MODE_PRIVATE)
-                val detected = prefs.getString("detected_offer", null)
-                startActivity(Intent(this@OfferAccessibilityService, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    putExtra("open_offer_assistant", true)
-                    putExtra("detected_offer", detected)
-                })
-            }
+            setOnClickListener { toggleKmPanel() }
         }
 
         val prefs = getSharedPreferences("drivesmart_history", MODE_PRIVATE)
@@ -325,6 +328,183 @@ class OfferAccessibilityService : AccessibilityService() {
         }
     }
 
+    private fun toggleKmPanel() {
+        if (kmPanel != null) {
+            hideKmPanel()
+        } else {
+            showKmPanel()
+        }
+    }
+
+    private fun showKmPanel() {
+        if (kmPanel != null) return
+        val prefs = getSharedPreferences("drivesmart_history", MODE_PRIVATE)
+        val detected = try {
+            JSONObject(prefs.getString("detected_offer", "{}") ?: "{}")
+        } catch (_: Exception) {
+            JSONObject()
+        }
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(16).toFloat()
+                setColor(0xFF102A43.toInt())
+                setStroke(dp(2), 0xFFFFC857.toInt())
+            }
+            elevation = dp(16).toFloat()
+        }
+        panel.addView(TextView(this).apply {
+            text = "CALCULAR TARIFA MÍNIMA"
+            textSize = 16f
+            setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            setTextColor(0xFFFFFFFF.toInt())
+            gravity = Gravity.CENTER
+        }, LinearLayout.LayoutParams(-1, -2))
+        panel.addView(TextView(this).apply {
+            text = "Ingresa los kilómetros de todo el trayecto"
+            textSize = 12f
+            setTextColor(0xFFD8E5F0.toInt())
+            setPadding(0, dp(4), 0, dp(8))
+        })
+        fun makeKmInput(label: String, value: Double): EditText {
+            return EditText(this).apply {
+                hint = label
+                setSingleLine(true)
+                inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+                setText(if (value > 0) value.toString() else "")
+                textSize = 16f
+                setTextColor(0xFF102A43.toInt())
+                setHintTextColor(0xFF687786.toInt())
+                setPadding(dp(10), dp(6), dp(10), dp(6))
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(8).toFloat()
+                    setColor(0xFFFFFFFF.toInt())
+                }
+            }
+        }
+        val emptyInput = makeKmInput("Km sin pasajero", detected.optDouble("kmEmpty", 0.0))
+        val passengerInput = makeKmInput("Km con pasajero", detected.optDouble("kmPassenger", 0.0))
+        emptyKmInput = emptyInput
+        passengerKmInput = passengerInput
+        panel.addView(TextView(this).apply {
+            text = "KM SIN PASAJERO"
+            textSize = 11f
+            setTextColor(0xFFFFC857.toInt())
+        })
+        panel.addView(emptyInput, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(8) })
+        panel.addView(TextView(this).apply {
+            text = "KM CON PASAJERO"
+            textSize = 11f
+            setTextColor(0xFFFFC857.toInt())
+        })
+        panel.addView(passengerInput, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(8) })
+        val minimum = TextView(this).apply {
+            text = "Tarifa mínima: ingresa ambas distancias"
+            textSize = 17f
+            setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            setTextColor(0xFFFFFFFF.toInt())
+            gravity = Gravity.CENTER
+            setPadding(0, dp(8), 0, dp(10))
+        }
+        minimumFareLabel = minimum
+        panel.addView(minimum, LinearLayout.LayoutParams(-1, -2))
+        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        actions.addView(Button(this).apply {
+            text = "Cerrar"
+            isAllCaps = false
+            setOnClickListener { hideKmPanel() }
+        }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { rightMargin = dp(6) })
+        actions.addView(Button(this).apply {
+            text = "Abrir app"
+            isAllCaps = false
+            setOnClickListener {
+                val current = prefs.getString("detected_offer", null)
+                startActivity(Intent(this@OfferAccessibilityService, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    putExtra("open_offer_assistant", true)
+                    putExtra("detected_offer", current)
+                })
+            }
+        }, LinearLayout.LayoutParams(0, dp(44), 1f))
+        panel.addView(actions)
+        val params = WindowManager.LayoutParams(
+            dp(280), WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            y = dp(110)
+            softInputMode = android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        }
+        val watcher = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                updateManualKmFare()
+            }
+            override fun afterTextChanged(s: Editable?) = Unit
+        }
+        emptyInput.addTextChangedListener(watcher)
+        passengerInput.addTextChangedListener(watcher)
+        try {
+            windowManager?.addView(panel, params)
+            kmPanel = panel
+            kmPanelParams = params
+            updateManualKmFare()
+        } catch (_: Exception) {
+            kmPanel = null
+            kmPanelParams = null
+        }
+    }
+
+    private fun updateManualKmFare() {
+        val empty = emptyKmInput?.text?.toString()?.trim()?.replace(',', '.')?.toDoubleOrNull()
+        val passenger = passengerKmInput?.text?.toString()?.trim()?.replace(',', '.')?.toDoubleOrNull()
+        val label = minimumFareLabel ?: return
+        if (empty == null || passenger == null || empty < 0.0 || passenger < 0.0 ||
+            !empty.isFinite() || !passenger.isFinite() || empty + passenger <= 0.0
+        ) {
+            label.text = "Tarifa mínima: ingresa ambas distancias"
+            bubble?.text = "TARIFA MÍNIMA\nFALTAN DATOS"
+            return
+        }
+        val totalKm = empty + passenger
+        val fare = calculateMinimumFare(totalKm)
+        if (fare == null) {
+            label.text = "No se puede calcular. Revisa la configuración del vehículo."
+            return
+        }
+        val formatted = NumberFormat.getNumberInstance(Locale("es", "CL")).format(fare)
+        label.text = "TOTAL: " + String.format(Locale("es", "CL"), "%.1f", totalKm) +
+            " km\nTARIFA MÍNIMA: $" + formatted
+        bubble?.text = "$" + formatted + "\nTARIFA MÍNIMA"
+        val prefs = getSharedPreferences("drivesmart_history", MODE_PRIVATE)
+        val detected = try {
+            JSONObject(prefs.getString("detected_offer", "{}") ?: "{}")
+        } catch (_: Exception) {
+            JSONObject()
+        }
+        detected.put("kmEmpty", empty)
+        detected.put("kmPassenger", passenger)
+        detected.put("distanceCount", 2)
+        detected.put("suggestedMinFare", fare)
+        detected.put("manualKmEntry", true)
+        detected.put("detectedAt", System.currentTimeMillis())
+        prefs.edit().putString("detected_offer", detected.toString()).apply()
+    }
+
+    private fun hideKmPanel() {
+        val panel = kmPanel ?: return
+        try { windowManager?.removeView(panel) } catch (_: Exception) {}
+        kmPanel = null
+        kmPanelParams = null
+        emptyKmInput = null
+        passengerKmInput = null
+        minimumFareLabel = null
+    }
+
     private fun hideBubble() {
         val view = bubble ?: return
         try { windowManager?.removeView(view) } catch (_: Exception) {}
@@ -342,6 +522,7 @@ class OfferAccessibilityService : AccessibilityService() {
             try { unregisterReceiver(visibilityReceiver) } catch (_: Exception) {}
             receiverRegistered = false
         }
+        hideKmPanel()
         hideBubble()
         windowManager = null
         super.onDestroy()
