@@ -218,7 +218,17 @@ class MainActivity : Activity() {
             textSize = 14f
             setTextColor(0xFF252B36.toInt())
         })
-        val savedConfig = preferences.getString("vehicle_config_$key", null)
+        val configKeys = setOf(
+            "rendimiento", "precio", "comision", "peajes",
+            "mantencionKm", "depreciacionKm", "otros", "objetivoKm"
+        )
+        val preferenceKey = "vehicle_config_$key"
+        val savedConfig = preferences.getString(preferenceKey, null)
+        // Persistir valores iniciales de configuración solo la primera vez.
+        // Nunca sobrescribir una preferencia que el usuario ya haya guardado.
+        if (savedConfig == null && key in configKeys) {
+            preferences.edit().putString(preferenceKey, initial).apply()
+        }
         val input = EditText(this).apply {
             setSingleLine(true)
             setText(savedConfig ?: initial)
@@ -235,8 +245,8 @@ class MainActivity : Activity() {
 
     private fun saveVehicleConfiguration() {
         val keys = listOf(
-            "rendimiento", "precio", "comision",
-            "mantencionKm", "depreciacionKm", "objetivoKm"
+            "rendimiento", "precio", "comision", "peajes",
+            "mantencionKm", "depreciacionKm", "otros", "objetivoKm"
         )
         val values = keys.associateWith { key ->
             inputs[key]?.text?.toString()?.trim().orEmpty()
