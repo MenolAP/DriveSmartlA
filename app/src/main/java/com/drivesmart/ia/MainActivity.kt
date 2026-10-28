@@ -88,6 +88,12 @@ class MainActivity : Activity() {
             setOnClickListener { showHistory() }
         }, params().apply { topMargin = dp(4) })
 
+        page.addView(Button(this).apply {
+            text = "Resumen diario y mensual"
+            isAllCaps = false
+            setOnClickListener { showPeriodSummary() }
+        }, params().apply { topMargin = dp(4) })
+
         result = TextView(this).apply {
             text = "Introduce los datos y pulsa Calcular."
             textSize = 16f
@@ -327,6 +333,99 @@ class MainActivity : Activity() {
             .setView(scroll)
             .setPositiveButton("Cerrar", null)
             .setNeutralButton("Borrar historial") { _, _ -> confirmClearHistory() }
+            .show()
+    }
+
+    private fun showPeriodSummary() {
+        val history = readHistory()
+        if (history.length() == 0) {
+            AlertDialog.Builder(this)
+                .setTitle("Resumen diario y mensual")
+                .setMessage("Guarda algunos viajes para ver tus ingresos, costos y ganancias por período.")
+                .setPositiveButton("Entendido", null)
+                .show()
+            return
+        }
+
+        // Cada grupo guarda: cantidad de viajes, ingresos, costos, ganancia y kilómetros.
+        val daily = linkedMapOf<String, DoubleArray>()
+        val monthly = linkedMapOf<String, DoubleArray>()
+        val dayKeyFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT)
+        val monthKeyFormat = SimpleDateFormat("yyyy-MM", Locale.ROOT)
+        val dayLabelFormat = SimpleDateFormat("EEE dd/MM", Locale("es", "CL"))
+        val monthLabelFormat = SimpleDateFormat("MMMM yyyy", Locale("es", "CL"))
+
+        for (i in 0 until history.length()) {
+            val trip = history.optJSONObject(i) ?: continue
+            val timestamp = trip.optLong("timestamp")
+            val date = Date(timestamp)
+            val values = doubleArrayOf(
+                1.0,
+                trip.optDouble("fare"),
+                trip.optDouble("totalCosts"),
+                trip.optDouble("net"),
+                trip.optDouble("totalKm")
+            )
+            val dayKey = dayKeyFormat.format(date)
+            val monthKey = monthKeyFormat.format(date)
+            val dayTotals = daily.getOrPut(dayKey) { DoubleArray(5) }
+            val monthTotals = monthly.getOrPut(monthKey) { DoubleArray(5) }
+            for (index in values.indices) {
+                dayTotals[index] += values[index]
+                monthTotals[index] += values[index]
+            }
+        }
+
+        val todayKey = dayKeyFormat.format(Date())
+        val currentMonthKey = monthKeyFormat.format(Date())
+        val today = daily[todayKey] ?: DoubleArray(5)
+        val thisMonth = monthly[currentMonthKey] ?: DoubleArray(5)
+
+        fun formatTotals(label: String, values: DoubleArray): String {
+            return "$label\n" +
+                "Viajes: ${values[0].toInt()}\n" +
+                "Ingresos: ${money.format(values[1])}\n" +
+                "Costos: ${money.format(values[2])}\n" +
+                "Ganancia: ${money.format(values[3])}\n" +
+                "Kilómetros: ${decimal.format(values[4])} km\n"
+        }
+
+        val detail = StringBuilder()
+        detail.append("ÚLTIMOS DÍAS CON VIAJES\n")
+        daily.entries.toList().asReversed().take(7).forEach { (key, values) ->
+            val parsedDate = try {
+                dayKeyFormat.parse(key)
+            } catch (_: Exception) {
+                null
+            }
+            val label = parsedDate?.let { dayLabelFormat.format(it) } ?: key
+            detail.append("\n").append(formatTotals(label, values))
+        }
+
+        detail.append("\nÚLTIMOS MESES CON VIAJES\n")
+        monthly.entries.toList().asReversed().take(6).forEach { (key, values) ->
+            val parsedDate = try {
+                monthKeyFormat.parse(key)
+            } catch (_: Exception) {
+                null
+            }
+            val label = parsedDate?.let { monthLabelFormat.format(it) } ?: key
+            detail.append("\n").append(formatTotals(label, values))
+        }
+
+        val summary = formatTotals("HOY", today) + "\n" +
+            formatTotals("ESTE MES", thisMonth) + "\n" + detail
+        val content = TextView(this).apply {
+            text = summary
+            textSize = 15f
+            setTextColor(0xFF14213D.toInt())
+            setPadding(dp(18), dp(12), dp(18), dp(12))
+        }
+        val scroll = ScrollView(this).apply { addView(content) }
+        AlertDialog.Builder(this)
+            .setTitle("Resumen diario y mensual")
+            .setView(scroll)
+            .setPositiveButton("Cerrar", null)
             .show()
     }
 
