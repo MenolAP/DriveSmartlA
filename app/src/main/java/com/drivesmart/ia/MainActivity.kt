@@ -529,7 +529,7 @@ class MainActivity : Activity() {
             return
         }
 
-        // Cada grupo guarda: cantidad de viajes, ingresos, costos, ganancia y kilómetros.
+        // Cada grupo guarda: viajes, ingresos, costos, ganancia, kilómetros y minutos acumulados.
         val daily = linkedMapOf<String, DoubleArray>()
         val monthly = linkedMapOf<String, DoubleArray>()
         val dayKeyFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT)
@@ -546,12 +546,13 @@ class MainActivity : Activity() {
                 trip.optDouble("fare"),
                 trip.optDouble("totalCosts"),
                 trip.optDouble("net"),
-                trip.optDouble("totalKm")
+                trip.optDouble("totalKm"),
+                trip.optDouble("minutes")
             )
             val dayKey = dayKeyFormat.format(date)
             val monthKey = monthKeyFormat.format(date)
-            val dayTotals = daily.getOrPut(dayKey) { DoubleArray(5) }
-            val monthTotals = monthly.getOrPut(monthKey) { DoubleArray(5) }
+            val dayTotals = daily.getOrPut(dayKey) { DoubleArray(6) }
+            val monthTotals = monthly.getOrPut(monthKey) { DoubleArray(6) }
             for (index in values.indices) {
                 dayTotals[index] += values[index]
                 monthTotals[index] += values[index]
@@ -560,8 +561,8 @@ class MainActivity : Activity() {
 
         val todayKey = dayKeyFormat.format(Date())
         val currentMonthKey = monthKeyFormat.format(Date())
-        val today = daily[todayKey] ?: DoubleArray(5)
-        val thisMonth = monthly[currentMonthKey] ?: DoubleArray(5)
+        val today = daily[todayKey] ?: DoubleArray(6)
+        val thisMonth = monthly[currentMonthKey] ?: DoubleArray(6)
 
         fun formatTotals(label: String, values: DoubleArray): String {
             return "$label\n" +
@@ -569,7 +570,9 @@ class MainActivity : Activity() {
                 "Ingresos: ${money.format(values[1])}\n" +
                 "Costos: ${money.format(values[2])}\n" +
                 "Ganancia: ${money.format(values[3])}\n" +
-                "Kilómetros: ${decimal.format(values[4])} km\n"
+                "Kilómetros: ${decimal.format(values[4])} km\n" +
+                "Tiempo estimado acumulado: ${decimal.format(values[5])} min\n" +
+                "Ganancia estimada por hora: ${if (values[5] > 0) money.format(values[3] / (values[5] / 60.0)) else "No calculable"}\n"
         }
 
         val detail = StringBuilder()
@@ -644,7 +647,7 @@ class MainActivity : Activity() {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale("es", "CL"))
         val csv = StringBuilder()
         // El punto y coma facilita la apertura en hojas de cálculo con configuración regional española.
-        csv.append("Fecha;Tarifa_CLP;Km_con_pasajero;Km_sin_pasajero;Tiempo_minutos;Km_totales;Combustible_CLP;Comision_CLP;Peajes_CLP;Mantencion_CLP;Depreciacion_CLP;Otros_costos_CLP;Costos_totales_CLP;Ganancia_neta_CLP;Ganancia_por_km_CLP;Ganancia_por_hora_CLP;Margen_porcentaje;Objetivo_por_km_CLP;Evaluacion\r\n")
+        csv.append("Fecha;Tarifa_CLP;Km_con_pasajero;Km_sin_pasajero;Tiempo_minutos;Km_totales;Combustible_CLP;Comision_CLP;Peajes_CLP;Mantencion_CLP;Depreciacion_CLP;Otros_costos_CLP;Costos_totales_CLP;Ganancia_neta_CLP;Ganancia_por_km_CLP;Ganancia_por_hora_CLP;Margen_porcentaje;Objetivo_por_km_CLP;Objetivo_por_hora_CLP;Evaluacion\r\n")
 
         for (i in 0 until history.length()) {
             val trip = history.optJSONObject(i) ?: continue
@@ -668,6 +671,7 @@ class MainActivity : Activity() {
                 if (trip.isNull("profitPerHour")) "" else trip.optDouble("profitPerHour").toString(),
                 trip.optDouble("margin").toString(),
                 trip.optDouble("targetPerKm").toString(),
+                trip.optDouble("targetPerHour").toString(),
                 trip.optString("recommendation")
             )
             csv.append(values.joinToString(";") { csvCell(it) }).append("\r\n")
