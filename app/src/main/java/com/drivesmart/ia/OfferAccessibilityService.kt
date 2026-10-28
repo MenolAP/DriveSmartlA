@@ -107,8 +107,11 @@ class OfferAccessibilityService : AccessibilityService() {
         // inDrive does not always expose the box color through accessibility.
         // Keep the existing blue-first/green-second convention and report when only one
         // distinct distance is exposed instead of pretending the second value was found.
-        val kmEmpty = distances.getOrNull(0) ?: 0.0
-        val kmPassenger = distances.getOrNull(1) ?: 0.0
+        // Accessibility events may repeat old text for a few seconds. Use the
+        // newest distinct distances, not the first ones from a previous offer.
+        val currentDistances = distances.takeLast(2)
+        val kmEmpty = currentDistances.getOrNull(0) ?: 0.0
+        val kmPassenger = currentDistances.getOrNull(1) ?: 0.0
         val signature = "$fare|$kmEmpty|$kmPassenger|$sourcePackage"
         if (signature == lastSignature && now - lastDetectedAt < 15000L) return
         lastSignature = signature
@@ -186,13 +189,17 @@ class OfferAccessibilityService : AccessibilityService() {
             Regex("(?:CLP|\\$)\\s*([0-9][0-9., ]{2,})", RegexOption.IGNORE_CASE),
             Regex("(?:tarifa|precio|ganas|recibes)\\D{0,12}([0-9][0-9., ]{2,})", RegexOption.IGNORE_CASE)
         )
+        val candidates = mutableListOf<Long>()
         for (pattern in patterns) {
-            val raw = pattern.find(text)?.groupValues?.getOrNull(1) ?: continue
-            val digits = raw.filter { it.isDigit() }
-            val value = digits.toLongOrNull() ?: continue
-            if (value in 500L..500_000L) return value
+            pattern.findAll(text).forEach { match ->
+                val raw = match.groupValues.getOrNull(1) ?: return@forEach
+                val digits = raw.filter { it.isDigit() }
+                val value = digits.toLongOrNull() ?: return@forEach
+                if (value in 500L..500_000L && value !in candidates) candidates.add(value)
+            }
         }
-        return null
+        // The recent event buffer can contain the previous offer; prefer the latest fare.
+        return candidates.lastOrNull()
     }
 
     private fun extractDistances(text: String): List<Double> {
@@ -212,7 +219,7 @@ class OfferAccessibilityService : AccessibilityService() {
                 if (found.none { kotlin.math.abs(it - value) < 0.0001 }) found.add(value)
             }
         }
-        return found.take(2)
+        return found.takeLast(2)
     }
 
     private fun syncBubbleVisibility() {
@@ -224,16 +231,19 @@ class OfferAccessibilityService : AccessibilityService() {
     private fun showBubble() {
         if (bubble != null) return
         val view = TextView(this).apply {
-            text = "MIN\\n?"
-            textSize = 10f
+            text = "TARIFA MÍN.\\nDetectando…"
+            textSize = 13f
+            setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
             gravity = Gravity.CENTER
             setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(8), dp(6), dp(8), dp(6))
             background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(0xFF147D5A.toInt())
-                setStroke(dp(2), 0xFFFFFFFF.toInt())
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(18).toFloat()
+                setColor(0xFF102A43.toInt())
+                setStroke(dp(3), 0xFFFFC857.toInt())
             }
-            elevation = dp(8).toFloat()
+            elevation = dp(14).toFloat()
             setOnClickListener {
                 val prefs = getSharedPreferences("drivesmart_history", MODE_PRIVATE)
                 val detected = prefs.getString("detected_offer", null)
@@ -247,7 +257,7 @@ class OfferAccessibilityService : AccessibilityService() {
 
         val prefs = getSharedPreferences("drivesmart_history", MODE_PRIVATE)
         val params = WindowManager.LayoutParams(
-            dp(72), dp(72),
+            dp(116), dp(76),
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
