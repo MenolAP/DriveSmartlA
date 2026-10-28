@@ -69,6 +69,7 @@ class MainActivity : Activity() {
         field(page, "Tarifa del viaje (CLP)", "tarifa", "5000")
         field(page, "Kilómetros con pasajero (km)", "km", "8")
         field(page, "Kilómetros sin pasajero (km)", "kmVacio", "0")
+        field(page, "Tiempo total estimado del viaje (minutos)", "minutos", "30")
         field(page, "Rendimiento del vehículo (km/l)", "rendimiento", "13")
         field(page, "Precio del combustible (CLP/l)", "precio", "1300")
 
@@ -303,6 +304,7 @@ class MainActivity : Activity() {
         val fare = number("tarifa")
         val kmPassenger = number("km")
         val kmEmpty = number("kmVacio")
+        val minutes = number("minutos")
         val efficiency = number("rendimiento")
         val fuelPrice = number("precio")
         val commissionPercent = number("comision")
@@ -312,7 +314,7 @@ class MainActivity : Activity() {
         val others = number("otros")
         val targetPerKm = number("objetivoKm")
         val values = listOf(
-            fare, kmPassenger, kmEmpty, efficiency, fuelPrice, commissionPercent,
+            fare, kmPassenger, kmEmpty, minutes, efficiency, fuelPrice, commissionPercent,
             tolls, maintenancePerKm, depreciationPerKm, others, targetPerKm
         )
 
@@ -323,6 +325,7 @@ class MainActivity : Activity() {
         val fareValue = fare ?: return
         val kmPassengerValue = kmPassenger ?: return
         val kmEmptyValue = kmEmpty ?: return
+        val minutesValue = minutes ?: return
         val efficiencyValue = efficiency ?: return
         val fuelPriceValue = fuelPrice ?: return
         val commissionPercentValue = commissionPercent ?: return
@@ -332,7 +335,7 @@ class MainActivity : Activity() {
         val othersValue = others ?: return
         val targetPerKmValue = targetPerKm ?: return
 
-        if (fareValue < 0 || kmPassengerValue < 0 || kmEmptyValue < 0 || efficiencyValue <= 0 ||
+        if (fareValue < 0 || kmPassengerValue < 0 || kmEmptyValue < 0 || minutesValue < 0 || efficiencyValue <= 0 ||
             fuelPriceValue < 0 || commissionPercentValue < 0 || commissionPercentValue > 100 ||
             tollsValue < 0 || maintenancePerKmValue < 0 || depreciationPerKmValue < 0 ||
             othersValue < 0 || targetPerKmValue < 0
@@ -351,6 +354,7 @@ class MainActivity : Activity() {
         val net = fareValue - totalCosts
         val margin = if (fareValue > 0) net / fareValue * 100.0 else 0.0
         val perKm = if (totalKm > 0) net / totalKm else 0.0
+        val profitPerHour = if (minutesValue > 0) net / (minutesValue / 60.0) else Double.NaN
         val costPerKm = if (totalKm > 0) totalCosts / totalKm else 0.0
         val emptyKmPercent = if (totalKm > 0) kmEmptyValue / totalKm * 100.0 else 0.0
         val baseCostsWithoutCommission = fuelCost + tollsValue + maintenanceCost + depreciationCost + othersValue
@@ -371,6 +375,7 @@ class MainActivity : Activity() {
             "Tarifa del viaje: ${money.format(fareValue)}\n" +
             "Distancia con pasajero: ${decimal.format(kmPassengerValue)} km\n" +
             "Distancia sin pasajero: ${decimal.format(kmEmptyValue)} km\n" +
+            "Tiempo estimado: ${decimal.format(minutesValue)} minutos\n" +
             "Distancia total considerada: ${decimal.format(totalKm)} km\n" +
             "Kilómetros sin pasajero: ${decimal.format(emptyKmPercent)}% del recorrido\n\n" +
             "Combustible estimado: ${decimal.format(fuelLiters)} litros\n" +
@@ -384,6 +389,7 @@ class MainActivity : Activity() {
             "Costo real estimado por km total: ${money.format(costPerKm)}\n\n" +
             "GANANCIA ESTIMADA: ${money.format(net)}\n" +
             "Ganancia por km total: ${money.format(perKm)}\n" +
+            "Ganancia estimada por hora: ${if (profitPerHour.isFinite()) money.format(profitPerHour) else "No calculable: introduce minutos mayores que cero"}\n" +
             "Objetivo mínimo: ${money.format(targetPerKmValue)} por km\n" +
             "TARIFA DE EQUILIBRIO (cubrir costos): ${if (breakEvenFare.isFinite()) money.format(kotlin.math.ceil(breakEvenFare)) else "No calculable con comisión del 100%"}\n" +
             "TARIFA MÍNIMA PARA TU OBJETIVO: ${if (viableFare.isFinite()) money.format(kotlin.math.ceil(viableFare)) else "No calculable con comisión del 100%"}\n" +
@@ -395,6 +401,8 @@ class MainActivity : Activity() {
             put("fare", fareValue)
             put("kmPassenger", kmPassengerValue)
             put("kmEmpty", kmEmptyValue)
+            put("minutes", minutesValue)
+            put("profitPerHour", profitPerHour.takeIf { it.isFinite() } ?: JSONObject.NULL)
             put("totalKm", totalKm)
             put("fuelLiters", fuelLiters)
             put("fuelCost", fuelCost)
@@ -627,7 +635,7 @@ class MainActivity : Activity() {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale("es", "CL"))
         val csv = StringBuilder()
         // El punto y coma facilita la apertura en hojas de cálculo con configuración regional española.
-        csv.append("Fecha;Tarifa_CLP;Km_con_pasajero;Km_sin_pasajero;Km_totales;Combustible_CLP;Comision_CLP;Peajes_CLP;Mantencion_CLP;Depreciacion_CLP;Otros_costos_CLP;Costos_totales_CLP;Ganancia_neta_CLP;Ganancia_por_km_CLP;Margen_porcentaje;Objetivo_por_km_CLP;Evaluacion\r\n")
+        csv.append("Fecha;Tarifa_CLP;Km_con_pasajero;Km_sin_pasajero;Tiempo_minutos;Km_totales;Combustible_CLP;Comision_CLP;Peajes_CLP;Mantencion_CLP;Depreciacion_CLP;Otros_costos_CLP;Costos_totales_CLP;Ganancia_neta_CLP;Ganancia_por_km_CLP;Ganancia_por_hora_CLP;Margen_porcentaje;Objetivo_por_km_CLP;Evaluacion\r\n")
 
         for (i in 0 until history.length()) {
             val trip = history.optJSONObject(i) ?: continue
@@ -637,6 +645,7 @@ class MainActivity : Activity() {
                 trip.optDouble("fare").toString(),
                 trip.optDouble("kmPassenger").toString(),
                 trip.optDouble("kmEmpty").toString(),
+                trip.optDouble("minutes").toString(),
                 trip.optDouble("totalKm").toString(),
                 trip.optDouble("fuelCost").toString(),
                 trip.optDouble("commissionCost").toString(),
@@ -647,6 +656,7 @@ class MainActivity : Activity() {
                 trip.optDouble("totalCosts").toString(),
                 trip.optDouble("net").toString(),
                 trip.optDouble("perKm").toString(),
+                if (trip.isNull("profitPerHour")) "" else trip.optDouble("profitPerHour").toString(),
                 trip.optDouble("margin").toString(),
                 trip.optDouble("targetPerKm").toString(),
                 trip.optString("recommendation")
