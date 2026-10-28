@@ -19,6 +19,10 @@ class MainActivity : Activity() {
         maximumFractionDigits = 0
         minimumFractionDigits = 0
     }
+    private val decimal = NumberFormat.getNumberInstance(Locale("es", "CL")).apply {
+        maximumFractionDigits = 1
+        minimumFractionDigits = 1
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,49 +32,75 @@ class MainActivity : Activity() {
             setBackgroundColor(0xFFF4F6F9.toInt())
         }
         val scroll = ScrollView(this).apply { addView(page) }
+
         page.addView(TextView(this).apply {
             text = "DriveSmartIA"
             textSize = 28f
             setTextColor(0xFF14213D.toInt())
         })
         page.addView(TextView(this).apply {
-            text = "Calculadora de rentabilidad para viajes inDrive (CLP)"
+            text = "Rentabilidad real estimada para viajes inDrive (CLP)"
             textSize = 16f
             setPadding(0, dp(8), 0, dp(18))
         })
+
         field(page, "Tarifa del viaje (CLP)", "tarifa", "5000")
-        field(page, "Distancia total (km)", "km", "8")
-        field(page, "Rendimiento (km/l)", "rendimiento", "14")
+        field(page, "Kilómetros con pasajero (km)", "km", "8")
+        field(page, "Kilómetros sin pasajero (km)", "kmVacio", "0")
+        field(page, "Rendimiento del vehículo (km/l)", "rendimiento", "14")
         field(page, "Precio del combustible (CLP/l)", "precio", "1300")
-        field(page, "Peajes (CLP)", "peajes", "0")
-        field(page, "Otros costos (CLP)", "otros", "0")
+
+        section(page, "Comisión y costos del vehículo")
+        field(page, "Comisión de la plataforma (%)", "comision", "0")
+        field(page, "Peajes del viaje (CLP)", "peajes", "0")
+        field(page, "Mantención y neumáticos por km (CLP/km)", "mantencionKm", "0")
+        field(page, "Depreciación por km (CLP/km)", "depreciacionKm", "0")
+        field(page, "Otros costos adicionales (CLP)", "otros", "0")
+
         page.addView(Button(this).apply {
             text = "Calcular rentabilidad"
             isAllCaps = false
             setOnClickListener { calculate() }
         }, params())
+
         result = TextView(this).apply {
             text = "Introduce los datos y pulsa Calcular."
-            textSize = 17f
+            textSize = 16f
+            setTextColor(0xFF14213D.toInt())
             setPadding(dp(14), dp(14), dp(14), dp(14))
             setBackgroundColor(0xFFFFFFFF.toInt())
         }
         page.addView(result, params().apply { topMargin = dp(14) })
         page.addView(TextView(this).apply {
-            text = "Estimación: incluye combustible, peajes y otros costos ingresados. Añade comisión, mantención y depreciación en Otros costos para una estimación más completa."
+            text = "Los valores de comisión, mantención y depreciación comienzan en cero: introduce tus costos reales. Los kilómetros sin pasajero también consumen combustible y generan desgaste. El resultado es una estimación, no una garantía de ganancia."
             textSize = 12f
+            setTextColor(0xFF606875.toInt())
             setPadding(0, dp(14), 0, 0)
         })
         setContentView(scroll)
     }
 
+    private fun section(parent: LinearLayout, title: String) {
+        parent.addView(TextView(this).apply {
+            text = title
+            textSize = 18f
+            setTextColor(0xFF14213D.toInt())
+            setPadding(0, dp(10), 0, dp(8))
+        })
+    }
+
     private fun field(parent: LinearLayout, label: String, key: String, initial: String) {
-        parent.addView(TextView(this).apply { text = label; textSize = 14f })
+        parent.addView(TextView(this).apply {
+            text = label
+            textSize = 14f
+            setTextColor(0xFF252B36.toInt())
+        })
         val input = EditText(this).apply {
             setSingleLine(true)
             setText(initial)
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
             hint = "0"
+            contentDescription = label
         }
         inputs[key] = input
         parent.addView(input, params().apply {
@@ -83,40 +113,71 @@ class MainActivity : Activity() {
         fun number(key: String): Double? {
             val raw = inputs[key]?.text?.toString()?.trim().orEmpty()
             if (raw.isBlank()) return 0.0
-            val normalized = if (raw.contains(',') && !raw.contains('.')) raw.replace(',', '.') else raw
+            val normalized = if (raw.contains(',') && !raw.contains('.')) {
+                raw.replace(',', '.')
+            } else {
+                raw.replace(",", "")
+            }
             return normalized.toDoubleOrNull()
         }
+
         val fare = number("tarifa")
-        val km = number("km")
+        val kmPassenger = number("km")
+        val kmEmpty = number("kmVacio")
         val efficiency = number("rendimiento")
         val fuelPrice = number("precio")
+        val commissionPercent = number("comision")
         val tolls = number("peajes")
+        val maintenancePerKm = number("mantencionKm")
+        val depreciationPerKm = number("depreciacionKm")
         val others = number("otros")
-        if (listOf(fare, km, efficiency, fuelPrice, tolls, others).any { it == null }) {
+        val values = listOf(
+            fare, kmPassenger, kmEmpty, efficiency, fuelPrice, commissionPercent,
+            tolls, maintenancePerKm, depreciationPerKm, others
+        )
+
+        if (values.any { it == null || !it.isFinite() }) {
             result.text = "Revisa los datos: introduce números válidos."
             return
         }
-        if (fare!! < 0 || km!! < 0 || efficiency!! <= 0 || fuelPrice!! < 0 || tolls!! < 0 || others!! < 0) {
-            result.text = "No uses valores negativos. El rendimiento debe ser mayor que cero."
+        if (fare!! < 0 || kmPassenger!! < 0 || kmEmpty!! < 0 || efficiency!! <= 0 ||
+            fuelPrice!! < 0 || commissionPercent!! < 0 || commissionPercent > 100 ||
+            tolls!! < 0 || maintenancePerKm!! < 0 || depreciationPerKm!! < 0 || others!! < 0
+        ) {
+            result.text = "Revisa los valores: no pueden ser negativos, el rendimiento debe ser mayor que cero y la comisión debe estar entre 0 y 100%."
             return
         }
-        val fuel = km / efficiency * fuelPrice
-        val costs = fuel + tolls + others
-        val net = fare - costs
-        val margin = if (fare > 0) net / fare * 100 else 0.0
+
+        val totalKm = kmPassenger + kmEmpty
+        val fuelCost = (totalKm / efficiency) * fuelPrice
+        val commissionCost = fare * commissionPercent / 100.0
+        val maintenanceCost = totalKm * maintenancePerKm
+        val depreciationCost = totalKm * depreciationPerKm
+        val totalCosts = fuelCost + commissionCost + tolls + maintenanceCost + depreciationCost + others
+        val net = fare - totalCosts
+        val margin = if (fare > 0) net / fare * 100.0 else 0.0
+        val perKm = if (totalKm > 0) net / totalKm else 0.0
+
         result.text = "RESULTADO ESTIMADO\n\n" +
-            "Tarifa: ${money.format(fare)}\n" +
-            "Combustible: ${money.format(fuel)}\n" +
+            "Tarifa del viaje: ${money.format(fare)}\n" +
+            "Distancia con pasajero: ${decimal.format(kmPassenger)} km\n" +
+            "Distancia sin pasajero: ${decimal.format(kmEmpty)} km\n" +
+            "Distancia total considerada: ${decimal.format(totalKm)} km\n\n" +
+            "Combustible: ${money.format(fuelCost)}\n" +
+            "Comisión plataforma: ${money.format(commissionCost)}\n" +
             "Peajes: ${money.format(tolls)}\n" +
+            "Mantención/neumáticos: ${money.format(maintenanceCost)}\n" +
+            "Depreciación: ${money.format(depreciationCost)}\n" +
             "Otros costos: ${money.format(others)}\n" +
-            "Costos considerados: ${money.format(costs)}\n\n" +
-            "Ganancia estimada: ${money.format(net)}\n" +
-            "Ganancia por km: ${money.format(if (km > 0) net / km else 0.0)}\n" +
-            "Margen: ${String.format(Locale("es", "CL"), "%.1f", margin)}%"
+            "Costos considerados: ${money.format(totalCosts)}\n\n" +
+            "GANANCIA ESTIMADA: ${money.format(net)}\n" +
+            "Ganancia por km total: ${money.format(perKm)}\n" +
+            "Margen sobre la tarifa: ${decimal.format(margin)}%"
     }
 
     private fun params() = LinearLayout.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
     )
+
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 }
