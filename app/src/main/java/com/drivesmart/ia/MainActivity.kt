@@ -140,28 +140,39 @@ class MainActivity : Activity() {
             result.text = "Revisa los datos: introduce números válidos."
             return
         }
-        if (fare!! < 0 || kmPassenger!! < 0 || kmEmpty!! < 0 || efficiency!! <= 0 ||
-            fuelPrice!! < 0 || commissionPercent!! < 0 || commissionPercent > 100 ||
-            tolls!! < 0 || maintenancePerKm!! < 0 || depreciationPerKm!! < 0 || others!! < 0
+        val fareValue = fare ?: return
+        val kmPassengerValue = kmPassenger ?: return
+        val kmEmptyValue = kmEmpty ?: return
+        val efficiencyValue = efficiency ?: return
+        val fuelPriceValue = fuelPrice ?: return
+        val commissionPercentValue = commissionPercent ?: return
+        val tollsValue = tolls ?: return
+        val maintenancePerKmValue = maintenancePerKm ?: return
+        val depreciationPerKmValue = depreciationPerKm ?: return
+        val othersValue = others ?: return
+
+        if (fareValue < 0 || kmPassengerValue < 0 || kmEmptyValue < 0 || efficiencyValue <= 0 ||
+            fuelPriceValue < 0 || commissionPercentValue < 0 || commissionPercentValue > 100 ||
+            tollsValue < 0 || maintenancePerKmValue < 0 || depreciationPerKmValue < 0 || othersValue < 0
         ) {
             result.text = "Revisa los valores: no pueden ser negativos, el rendimiento debe ser mayor que cero y la comisión debe estar entre 0 y 100%."
             return
         }
 
-        val totalKm = kmPassenger + kmEmpty
-        val fuelCost = (totalKm / efficiency) * fuelPrice
-        val commissionCost = fare * commissionPercent / 100.0
-        val maintenanceCost = totalKm * maintenancePerKm
-        val depreciationCost = totalKm * depreciationPerKm
-        val totalCosts = fuelCost + commissionCost + tolls + maintenanceCost + depreciationCost + others
-        val net = fare - totalCosts
-        val margin = if (fare > 0) net / fare * 100.0 else 0.0
+        val totalKm = kmPassengerValue + kmEmptyValue
+        val fuelCost = (totalKm / efficiencyValue) * fuelPriceValue
+        val commissionCost = fareValue * commissionPercentValue / 100.0
+        val maintenanceCost = totalKm * maintenancePerKmValue
+        val depreciationCost = totalKm * depreciationPerKmValue
+        val totalCosts = fuelCost + commissionCost + tollsValue + maintenanceCost + depreciationCost + othersValue
+        val net = fareValue - totalCosts
+        val margin = if (fareValue > 0) net / fareValue * 100.0 else 0.0
         val perKm = if (totalKm > 0) net / totalKm else 0.0
 
         result.text = "RESULTADO ESTIMADO\n\n" +
-            "Tarifa del viaje: ${money.format(fare)}\n" +
-            "Distancia con pasajero: ${decimal.format(kmPassenger)} km\n" +
-            "Distancia sin pasajero: ${decimal.format(kmEmpty)} km\n" +
+            "Tarifa del viaje: ${money.format(fareValue)}\n" +
+            "Distancia con pasajero: ${decimal.format(kmPassengerValue)} km\n" +
+            "Distancia sin pasajero: ${decimal.format(kmEmptyValue)} km\n" +
             "Distancia total considerada: ${decimal.format(totalKm)} km\n\n" +
             "Combustible: ${money.format(fuelCost)}\n" +
             "Comisión plataforma: ${money.format(commissionCost)}\n" +
