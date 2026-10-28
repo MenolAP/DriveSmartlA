@@ -1,0 +1,112 @@
+name: Build DriveSmartIA APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android Project Structure
+        run: |
+          mkdir -p app/src/main
+          if [ ! -f "app/build.gradle" ]; then
+            cat << 'EOF' > app/build.gradle
+            plugins {
+                id 'com.android.application'
+                id 'org.jetbrains.kotlin.android'
+            }
+            android {
+                namespace 'com.drivesmart.ia'
+                compileSdk 34
+                defaultConfig {
+                    applicationId "com.drivesmart.ia"
+                    minSdk 26
+                    targetSdk 34
+                    versionCode 1
+                    versionName "1.0"
+                }
+            }
+            dependencies {
+                implementation 'androidx.core:core-ktx:1.12.0'
+                implementation 'androidx.appcompat:appcompat:1.6.1'
+                implementation 'com.google.android.material:material:1.11.0'
+            }
+            EOF
+          fi
+
+          if [ ! -f "settings.gradle" ]; then
+            echo "include ':app'" > settings.gradle
+          fi
+
+          if [ ! -f "build.gradle" ]; then
+            cat << 'EOF' > build.gradle
+            buildscript {
+                repositories {
+                    google()
+                    mavenCentral()
+                }
+                dependencies {
+                    classpath 'com.android.tools.build:gradle:8.1.1'
+                    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0"
+                }
+            }
+            allprojects {
+                repositories {
+                    google()
+                    mavenCentral()
+                }
+            }
+            EOF
+          fi
+
+          if [ ! -f "AndroidManifest.xml" ] && [ ! -f "app/src/main/AndroidManifest.xml" ]; then
+            mkdir -p app/src/main
+            cat << 'EOF' > app/src/main/AndroidManifest.xml
+            <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+                <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+                <application
+                    android:allowBackup="true"
+                    android:icon="@mipmap/ic_launcher"
+                    android:label="DriveSmart IA"
+                    android:roundIcon="@mipmap/ic_launcher_round"
+                    android:supportsRtl="true"
+                    android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
+                    <activity
+                        android:name=".MainActivity"
+                        android:exported="true">
+                        <intent-filter>
+                            <action android:name="android.intent.action.MAIN" />
+                            <category android:name="android.intent.category.LAUNCHER" />
+                        </intent-filter>
+                    </activity>
+                    <service
+                        android:name=".OverlayService"
+                        android:exported="false" />
+                </application>
+            </manifest>
+            EOF
+          fi
+
+          gradle wrapper --gradle-version 8.5
+
+      - name: Build Debug APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
