@@ -248,7 +248,7 @@ class MainActivity : Activity() {
     private fun saveVehicleConfiguration() {
         val keys = listOf(
             "rendimiento", "precio", "comision", "peajes",
-            "mantencionKm", "depreciacionKm", "otros", "objetivoKm"
+            "mantencionKm", "depreciacionKm", "otros", "objetivoKm", "objetivoHora"
         )
         val values = keys.associateWith { key ->
             inputs[key]?.text?.toString()?.trim().orEmpty()
@@ -397,7 +397,8 @@ class MainActivity : Activity() {
             "GANANCIA ESTIMADA: ${money.format(net)}\n" +
             "Ganancia por km total: ${money.format(perKm)}\n" +
             "Ganancia estimada por hora: ${if (profitPerHour.isFinite()) money.format(profitPerHour) else "No calculable: introduce minutos mayores que cero"}\n" +
-            "Objetivo mínimo: ${money.format(targetPerKmValue)} por km\\n" +\n            "Objetivo mínimo por hora: ${money.format(targetPerHourValue)}/h\n" +
+            "Objetivo mínimo: ${money.format(targetPerKmValue)} por km\n" +
+            "Objetivo mínimo por hora: ${money.format(targetPerHourValue)}/h\n" +
             "TARIFA DE EQUILIBRIO (cubrir costos): ${if (breakEvenFare.isFinite()) money.format(kotlin.math.ceil(breakEvenFare)) else "No calculable con comisión del 100%"}\n" +
             "TARIFA MÍNIMA PARA TUS OBJETIVOS: ${if (viableFare.isFinite()) money.format(kotlin.math.ceil(viableFare)) else "No calculable con comisión del 100%"}\n" +
             "Evaluación del viaje: ${recommendation}\n" +
