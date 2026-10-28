@@ -59,7 +59,7 @@ class OfferAccessibilityService : AccessibilityService() {
                 put("detectedAt", now)
             }.toString())
             .apply()
-        bubble?.text = "DS\n" + "$" + fare
+        bubble?.text = "DS\n" + 36.toChar() + fare
     }
 
     private fun appendTreeText(node: android.view.accessibility.AccessibilityNodeInfo, out: StringBuilder, depth: Int) {
