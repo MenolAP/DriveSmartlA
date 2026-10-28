@@ -88,17 +88,37 @@ class MainActivity : Activity() {
         }, params())
 
         page.addView(Button(this).apply {
-            text = "Activar botón flotante y detección de ofertas"
+            text = if (preferences.getBoolean(OfferAccessibilityService.PREF_BUBBLE_ENABLED, true))
+                "Desactivar botón flotante" else "Activar botón flotante"
+            isAllCaps = false
+            setOnClickListener {
+                val enabled = preferences.getBoolean(OfferAccessibilityService.PREF_BUBBLE_ENABLED, true)
+                if (enabled) {
+                    preferences.edit().putBoolean(OfferAccessibilityService.PREF_BUBBLE_ENABLED, false).apply()
+                    sendBroadcast(Intent(OfferAccessibilityService.ACTION_BUBBLE_VISIBILITY_CHANGED).setPackage(packageName))
+                    text = "Activar botón flotante"
+                    Toast.makeText(this@MainActivity, "Botón flotante desactivado. La app seguirá disponible.", Toast.LENGTH_SHORT).show()
+                } else {
+                    preferences.edit().putBoolean(OfferAccessibilityService.PREF_BUBBLE_ENABLED, true).apply()
+                    sendBroadcast(Intent(OfferAccessibilityService.ACTION_BUBBLE_VISIBILITY_CHANGED).setPackage(packageName))
+                    text = "Desactivar botón flotante"
+                    Toast.makeText(this@MainActivity, "Botón flotante activado. Mantén pulsado para moverlo.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }, params().apply { topMargin = dp(8); bottomMargin = dp(4) })
+
+        page.addView(Button(this).apply {
+            text = "Configurar accesibilidad de ofertas"
             isAllCaps = false
             setOnClickListener {
                 AlertDialog.Builder(this@MainActivity)
-                    .setTitle("Activar asistente flotante")
-                    .setMessage("Abre Accesibilidad, busca DriveSmartIA y activa el servicio. Intentará leer tarifa y kilómetros del texto accesible de inDrive. No acepta viajes por ti; si no puede leer los datos, introdúcelos manualmente.")
-                    .setNegativeButton("Ahora no", null)
+                    .setTitle("Accesibilidad de DriveSmartIA")
+                    .setMessage("Abre los ajustes para comprobar que el servicio de DriveSmartIA esté activado. La detección solo funciona con el texto que inDrive expone a Android; si no expone el recuadro verde, habrá que revisar el diagnóstico.")
+                    .setNegativeButton("Cancelar", null)
                     .setPositiveButton("Abrir ajustes") { _, _ -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
                     .show()
             }
-        }, params().apply { topMargin = dp(8); bottomMargin = dp(8) })
+        }, params().apply { topMargin = dp(4); bottomMargin = dp(8) })
 
         saveButton = Button(this).apply {
             text = "Guardar viaje en historial"
