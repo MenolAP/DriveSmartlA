@@ -136,7 +136,7 @@ class MainActivity : Activity() {
         val targetPerKm = number("objetivoKm")
         val values = listOf(
             fare, kmPassenger, kmEmpty, efficiency, fuelPrice, commissionPercent,
-            tolls, maintenancePerKm, depreciationPerKm, others
+            tolls, maintenancePerKm, depreciationPerKm, others,
             targetPerKm
         )
 
