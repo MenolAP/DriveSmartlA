@@ -8,7 +8,6 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.TextView
 import org.json.JSONObject
-import java.util.Locale
 
 /**
  * Floating quick-access bubble and best-effort inDrive offer reader.
@@ -30,6 +29,8 @@ class OfferAccessibilityService : AccessibilityService() {
         if (event == null) return
         val packageName = event.packageName?.toString() ?: return
         if (packageName == packageNameForOwnApp()) return
+        val source = packageName.lowercase()
+        if (!source.contains("indriver") && !source.contains("indrive")) return
         val text = buildString {
             event.text.forEach { append(it).append(' ') }
             event.contentDescription?.let { append(it).append(' ') }
@@ -58,7 +59,7 @@ class OfferAccessibilityService : AccessibilityService() {
                 put("detectedAt", now)
             }.toString())
             .apply()
-        bubble?.text = "DS\n$$fare"
+        bubble?.text = "DS\n" + "$" + fare
     }
 
     private fun appendTreeText(node: android.view.accessibility.AccessibilityNodeInfo, out: StringBuilder, depth: Int) {
