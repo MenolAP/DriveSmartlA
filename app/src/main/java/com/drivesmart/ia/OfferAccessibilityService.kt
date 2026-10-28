@@ -45,8 +45,13 @@ class OfferAccessibilityService : AccessibilityService() {
         if (text.isBlank()) return
         val normalized = text.replace("\\s+".toRegex(), " ").trim()
         val fare = extractFare(normalized) ?: return
-        val km = extractKm(normalized) ?: return
-        val signature = "$fare|$km|$packageName"
+        val distances = extractDistances(normalized)
+        if (distances.isEmpty()) return
+        // Blue box = empty-trip km; green box = passenger-trip km.
+        // If accessibility exposes only one distance, the app warns the user to verify manually.
+        val kmEmpty = distances.getOrNull(0) ?: 0.0
+        val kmPassenger = distances.getOrNull(1) ?: 0.0
+        val signature = "$fare|$kmEmpty|$kmPassenger|$packageName"
         val now = System.currentTimeMillis()
         if (signature == lastSignature && now - lastDetectedAt < 15_000L) return
         lastSignature = signature
@@ -54,7 +59,9 @@ class OfferAccessibilityService : AccessibilityService() {
         getSharedPreferences("drivesmart_history", MODE_PRIVATE).edit()
             .putString("detected_offer", JSONObject().apply {
                 put("fare", fare)
-                put("km", km)
+                put("kmEmpty", kmEmpty)
+                put("kmPassenger", kmPassenger)
+                put("distanceCount", distances.size)
                 put("sourcePackage", packageName)
                 put("detectedAt", now)
             }.toString())
@@ -86,10 +93,16 @@ class OfferAccessibilityService : AccessibilityService() {
         return null
     }
 
-    private fun extractKm(text: String): Double? {
-        val match = Regex("([0-9]+(?:[.,][0-9]+)?)\\s*(?:km|kil[oó]metros?)", RegexOption.IGNORE_CASE)
-            .find(text) ?: return null
-        return match.groupValues[1].replace(',', '.').toDoubleOrNull()?.takeIf { it in 0.1..300.0 }
+    private fun extractDistances(text: String): List<Double> {
+        val regex = Regex("([0-9]+(?:[.,][0-9]+)?)\\s*(?:km|kil[oó]metros?)", RegexOption.IGNORE_CASE)
+        return regex.findAll(text)
+            .mapNotNull { match ->
+                match.groupValues[1].replace(',', '.').toDoubleOrNull()
+                    ?.takeIf { it in 0.0..300.0 }
+            }
+            .distinct()
+            .take(2)
+            .toList()
     }
 
     private fun showBubble() {
