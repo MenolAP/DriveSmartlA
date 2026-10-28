@@ -3,6 +3,7 @@ package com.drivesmart.ia
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.provider.Settings
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
@@ -86,6 +87,19 @@ class MainActivity : Activity() {
             setOnClickListener { calculate() }
         }, params())
 
+        page.addView(Button(this).apply {
+            text = "Activar botón flotante y detección de ofertas"
+            isAllCaps = false
+            setOnClickListener {
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("Activar asistente flotante")
+                    .setMessage("Abre Accesibilidad, busca DriveSmartIA y activa el servicio. Intentará leer tarifa y kilómetros del texto accesible de inDrive. No acepta viajes por ti; si no puede leer los datos, introdúcelos manualmente.")
+                    .setNegativeButton("Ahora no", null)
+                    .setPositiveButton("Abrir ajustes") { _, _ -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+                    .show()
+            }
+        }, params().apply { topMargin = dp(8); bottomMargin = dp(8) })
+
         saveButton = Button(this).apply {
             text = "Guardar viaje en historial"
             isAllCaps = false
@@ -127,6 +141,36 @@ class MainActivity : Activity() {
             setPadding(0, dp(14), 0, 0)
         })
         setContentView(scroll)
+        handleDetectedOffer(intent)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        if (intent != null) { setIntent(intent); handleDetectedOffer(intent) }
+    }
+
+    private fun handleDetectedOffer(intent: Intent?) {
+        if (intent?.getBooleanExtra("open_offer_assistant", false) != true) return
+        val raw = intent.getStringExtra("detected_offer") ?: preferences.getString("detected_offer", null)
+        if (raw.isNullOrBlank()) {
+            AlertDialog.Builder(this).setTitle("Asistente de viaje")
+                .setMessage("No pude reconocer una oferta. Introduce manualmente tarifa y kilómetros y pulsa Calcular rentabilidad.")
+                .setPositiveButton("Entendido", null).show()
+            return
+        }
+        try {
+            val offer = JSONObject(raw)
+            val fare = offer.optLong("fare", 0L)
+            val km = offer.optDouble("km", 0.0)
+            if (fare > 0 && km > 0) {
+                inputs["tarifa"]?.setText(fare.toString())
+                inputs["km"]?.setText(km.toString())
+                inputs["kmVacio"]?.setText("0")
+                calculate()
+                Toast.makeText(this, "Oferta detectada: revisa los datos y la tarifa mínima sugerida.", Toast.LENGTH_LONG).show()
+            } else Toast.makeText(this, "Oferta incompleta; revisa los datos manualmente.", Toast.LENGTH_LONG).show()
+        } catch (_: Exception) { Toast.makeText(this, "No se pudo interpretar la oferta; ingrésala manualmente.", Toast.LENGTH_LONG).show() }
+        intent.removeExtra("open_offer_assistant")
     }
 
     private fun section(parent: LinearLayout, title: String) {
@@ -266,6 +310,10 @@ class MainActivity : Activity() {
         val net = fareValue - totalCosts
         val margin = if (fareValue > 0) net / fareValue * 100.0 else 0.0
         val perKm = if (totalKm > 0) net / totalKm else 0.0
+        val baseCostsWithoutCommission = fuelCost + tollsValue + maintenanceCost + depreciationCost + othersValue
+        val viableFare = if (commissionPercentValue < 100.0) {
+            (baseCostsWithoutCommission + targetPerKmValue * totalKm) / (1.0 - commissionPercentValue / 100.0)
+        } else Double.POSITIVE_INFINITY
         val recommendation = when {
             net <= 0 -> "NO CONVIENE: la ganancia estimada no es positiva."
             totalKm <= 0 -> "NO SE PUEDE EVALUAR: introduce kilómetros mayores que cero."
@@ -288,6 +336,7 @@ class MainActivity : Activity() {
             "GANANCIA ESTIMADA: ${money.format(net)}\n" +
             "Ganancia por km total: ${money.format(perKm)}\n" +
             "Objetivo mínimo: ${money.format(targetPerKmValue)} por km\n" +
+            "TARIFA MÍNIMA SUGERIDA: ${if (viableFare.isFinite()) money.format(kotlin.math.ceil(viableFare)) else "No calculable con comisión del 100%"}\n" +
             "Evaluación del viaje: ${recommendation}\n" +
             "Margen sobre la tarifa: ${decimal.format(margin)}%"
 
