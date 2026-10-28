@@ -475,11 +475,11 @@ class MainActivity : Activity() {
         }
         val hourly = if (profitPerHour.isFinite()) money.format(profitPerHour) else "No calculable"
         val fareTarget = if (viableFare.isFinite()) money.format(kotlin.math.ceil(viableFare)) else "No calculable"
-        val detail = "Ganancia neta estimada: ${money.format(net)}\\n" +
-            "Ganancia por km total: ${money.format(perKm)} (mínimo ${money.format(targetPerKm)})\\n" +
-            "Ganancia por hora: $hourly (objetivo ${money.format(targetPerHour)}/h)\\n" +
-            "Tarifa mínima para tus objetivos: $fareTarget\\n\\n" +
-            explanation + "\\n\\nEs una estimación: confirma distancia, tiempo, comisión, peajes y costos reales."
+        val detail = "Ganancia neta estimada: ${money.format(net)}\n" +
+            "Ganancia por km total: ${money.format(perKm)} (mínimo ${money.format(targetPerKm)})\n" +
+            "Ganancia por hora: $hourly (objetivo ${money.format(targetPerHour)}/h)\n" +
+            "Tarifa mínima para tus objetivos: $fareTarget\n\n" +
+            explanation + "\n\nEs una estimación: confirma distancia, tiempo, comisión, peajes y costos reales."
         AlertDialog.Builder(this).setTitle(decision).setMessage(detail)
             .setPositiveButton("Volver a la oferta", null)
             .setNeutralButton("Ver cálculo completo") { _, _ -> result.requestFocus() }
