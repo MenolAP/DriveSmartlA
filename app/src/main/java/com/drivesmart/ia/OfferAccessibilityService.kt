@@ -333,10 +333,21 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private fun toggleKmPanel() {
+        // The floating bubble is the single toggle: tap once to open the km panel,
+        // tap it again to close the panel without needing the panel's Close button.
         if (kmPanel != null) {
             hideKmPanel()
         } else {
             showKmPanel()
+        }
+        updateBubblePanelHint()
+    }
+
+    private fun updateBubblePanelHint() {
+        bubble?.contentDescription = if (kmPanel != null) {
+            "Calculadora de kilómetros abierta. Toca otra vez el botón flotante para ocultarla."
+        } else {
+            "Calculadora de kilómetros cerrada. Toca el botón flotante para abrirla."
         }
     }
 
@@ -474,6 +485,7 @@ class OfferAccessibilityService : AccessibilityService() {
             windowManager?.addView(panel, params)
             kmPanel = panel
             kmPanelParams = params
+            updateBubblePanelHint()
             updateManualKmFare()
         } catch (_: Exception) {
             kmPanel = null
@@ -525,6 +537,7 @@ class OfferAccessibilityService : AccessibilityService() {
         emptyKmInput = null
         passengerKmInput = null
         minimumFareLabel = null
+        updateBubblePanelHint()
     }
 
     private fun hideBubble() {
