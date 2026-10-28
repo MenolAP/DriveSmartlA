@@ -99,7 +99,15 @@ class OfferAccessibilityService : AccessibilityService() {
         }.takeLast(12000)
         recentTextAt = now
 
-        val normalized = recentAccessibilityText.replace(Regex("\\s+"), " ").trim()
+        val freshNormalized = currentText.replace(Regex("\\s+"), " ").trim()
+        val freshDistances = extractDistances(freshNormalized)
+        // If this accessibility event already contains a complete offer, do not mix
+        // it with distances or fares left over from the previous card.
+        val normalized = if (extractFare(freshNormalized) != null && freshDistances.size >= 2) {
+            freshNormalized
+        } else {
+            recentAccessibilityText.replace(Regex("\\s+"), " ").trim()
+        }
         val fare = extractFare(normalized) ?: return
         val distances = extractDistances(normalized)
         if (distances.isEmpty()) return
