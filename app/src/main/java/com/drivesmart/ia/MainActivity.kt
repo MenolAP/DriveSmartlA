@@ -56,6 +56,8 @@ class MainActivity : Activity() {
         field(page, "Mantención y neumáticos por km (CLP/km)", "mantencionKm", "0")
         field(page, "Depreciación por km (CLP/km)", "depreciacionKm", "0")
         field(page, "Otros costos adicionales (CLP)", "otros", "0")
+        section(page, "Objetivo de rentabilidad")
+        field(page, "Ganancia mínima deseada por km total (CLP/km)", "objetivoKm", "300")
 
         page.addView(Button(this).apply {
             text = "Calcular rentabilidad"
@@ -131,9 +133,11 @@ class MainActivity : Activity() {
         val maintenancePerKm = number("mantencionKm")
         val depreciationPerKm = number("depreciacionKm")
         val others = number("otros")
+        val targetPerKm = number("objetivoKm")
         val values = listOf(
             fare, kmPassenger, kmEmpty, efficiency, fuelPrice, commissionPercent,
             tolls, maintenancePerKm, depreciationPerKm, others
+            targetPerKm
         )
 
         if (values.any { it == null || !it.isFinite() }) {
@@ -150,10 +154,12 @@ class MainActivity : Activity() {
         val maintenancePerKmValue = maintenancePerKm ?: return
         val depreciationPerKmValue = depreciationPerKm ?: return
         val othersValue = others ?: return
+        val targetPerKmValue = targetPerKm ?: return
 
         if (fareValue < 0 || kmPassengerValue < 0 || kmEmptyValue < 0 || efficiencyValue <= 0 ||
             fuelPriceValue < 0 || commissionPercentValue < 0 || commissionPercentValue > 100 ||
-            tollsValue < 0 || maintenancePerKmValue < 0 || depreciationPerKmValue < 0 || othersValue < 0
+            tollsValue < 0 || maintenancePerKmValue < 0 || depreciationPerKmValue < 0 ||
+            othersValue < 0 || targetPerKmValue < 0
         ) {
             result.text = "Revisa los valores: no pueden ser negativos, el rendimiento debe ser mayor que cero y la comisión debe estar entre 0 y 100%."
             return
@@ -168,6 +174,12 @@ class MainActivity : Activity() {
         val net = fareValue - totalCosts
         val margin = if (fareValue > 0) net / fareValue * 100.0 else 0.0
         val perKm = if (totalKm > 0) net / totalKm else 0.0
+        val recommendation = when {
+            net <= 0 -> "NO CONVIENE: la ganancia estimada no es positiva."
+            totalKm <= 0 -> "NO SE PUEDE EVALUAR: introduce kilómetros mayores que cero."
+            perKm < targetPerKmValue -> "BAJO TU OBJETIVO: revisa la tarifa, distancia o costos."
+            else -> "CUMPLE TU OBJETIVO: alcanza tu mínimo de ganancia por km."
+        }
 
         result.text = "RESULTADO ESTIMADO\n\n" +
             "Tarifa del viaje: ${money.format(fareValue)}\n" +
@@ -183,6 +195,8 @@ class MainActivity : Activity() {
             "Costos considerados: ${money.format(totalCosts)}\n\n" +
             "GANANCIA ESTIMADA: ${money.format(net)}\n" +
             "Ganancia por km total: ${money.format(perKm)}\n" +
+            "Objetivo mínimo: ${money.format(targetPerKmValue)} por km\n" +
+            "Evaluación del viaje: ${recommendation}\n" +
             "Margen sobre la tarifa: ${decimal.format(margin)}%"
     }
 
