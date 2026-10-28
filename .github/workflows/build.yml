@@ -14,57 +14,20 @@ jobs:
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
 
-      - name: Setup Folders and Build Files
-        run: |
-          mkdir -p app/src/main/java/com/drivesmart/ia
-          
-          # Crear build.gradle de la app
-          echo "plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }" > app/build.gradle
-          echo "android { namespace 'com.drivesmart.ia'; compileSdk 34; defaultConfig { applicationId 'com.drivesmart.ia'; minSdk 26; targetSdk 34; versionCode 1; versionName '1.0' } }" >> app/build.gradle
-          echo "dependencies { implementation 'androidx.core:core-ktx:1.12.0'; implementation 'androidx.appcompat:appcompat:1.6.1'; implementation 'com.google.android.material:material:1.11.0' }" >> app/build.gradle
+      - name: Set up Gradle 8.1.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.1.1'
 
-          # Crear settings.gradle con la gestión de repositorios centralizada
-          cat << 'EOF' > settings.gradle
-          pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          include ':app'
-          EOF
+      - name: Build debug APK
+        run: gradle --no-daemon assembleDebug
 
-          # Crear build.gradle raíz limpio sin repositorios redundantes
-          cat << 'EOF' > build.gradle
-          buildscript {
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:8.1.1'
-                  classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0"
-              }
-          }
-          EOF
-
-          # Generar gradlew
-          gradle wrapper --gradle-version 8.5
-
-      - name: Build Debug APK
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug
-
-      - name: Upload APK Artifact
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
+          name: DriveSmartIA-debug
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
