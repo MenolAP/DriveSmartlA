@@ -2,6 +2,8 @@ package com.drivesmart.ia
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
 import android.view.ViewGroup
@@ -15,10 +17,14 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
+import java.nio.charset.StandardCharsets
 import java.util.Date
 import java.util.Locale
 
 class MainActivity : Activity() {
+    companion object {
+        private const val REQUEST_EXPORT_CSV = 4207
+    }
     private val inputs = mutableMapOf<String, EditText>()
     private lateinit var result: TextView
     private lateinit var saveButton: Button
@@ -92,6 +98,12 @@ class MainActivity : Activity() {
             text = "Ver historial de viajes"
             isAllCaps = false
             setOnClickListener { showHistory() }
+        }, params().apply { topMargin = dp(4) })
+
+        page.addView(Button(this).apply {
+            text = "Exportar historial a CSV"
+            isAllCaps = false
+            setOnClickListener { exportHistoryCsv() }
         }, params().apply { topMargin = dp(4) })
 
         page.addView(Button(this).apply {
@@ -476,6 +488,85 @@ class MainActivity : Activity() {
             .setView(scroll)
             .setPositiveButton("Cerrar", null)
             .show()
+    }
+
+    private fun exportHistoryCsv() {
+        val history = readHistory()
+        if (history.length() == 0) {
+            Toast.makeText(this, "No hay viajes para exportar.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "text/csv"
+            putExtra(Intent.EXTRA_TITLE, "DriveSmartIA_historial.csv")
+        }
+        try {
+            startActivityForResult(intent, REQUEST_EXPORT_CSV)
+        } catch (_: Exception) {
+            Toast.makeText(this, "No se pudo abrir el selector para guardar el CSV.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    @Deprecated("Usa el selector de documentos de Android para exportar el historial.")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_EXPORT_CSV || resultCode != RESULT_OK) return
+        val uri: Uri = data?.data ?: return
+        val history = readHistory()
+        if (history.length() == 0) {
+            Toast.makeText(this, "No hay viajes para exportar.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale("es", "CL"))
+        val csv = StringBuilder()
+        // El punto y coma facilita la apertura en hojas de cálculo con configuración regional española.
+        csv.append("Fecha;Tarifa_CLP;Km_con_pasajero;Km_sin_pasajero;Km_totales;Combustible_CLP;Comision_CLP;Peajes_CLP;Mantencion_CLP;Depreciacion_CLP;Otros_costos_CLP;Costos_totales_CLP;Ganancia_neta_CLP;Ganancia_por_km_CLP;Margen_porcentaje;Objetivo_por_km_CLP;Evaluacion\r\n")
+
+        for (i in 0 until history.length()) {
+            val trip = history.optJSONObject(i) ?: continue
+            val date = dateFormat.format(Date(trip.optLong("timestamp")))
+            val values = listOf(
+                date,
+                trip.optDouble("fare").toString(),
+                trip.optDouble("kmPassenger").toString(),
+                trip.optDouble("kmEmpty").toString(),
+                trip.optDouble("totalKm").toString(),
+                trip.optDouble("fuelCost").toString(),
+                trip.optDouble("commissionCost").toString(),
+                trip.optDouble("tolls").toString(),
+                trip.optDouble("maintenanceCost").toString(),
+                trip.optDouble("depreciationCost").toString(),
+                trip.optDouble("others").toString(),
+                trip.optDouble("totalCosts").toString(),
+                trip.optDouble("net").toString(),
+                trip.optDouble("perKm").toString(),
+                trip.optDouble("margin").toString(),
+                trip.optDouble("targetPerKm").toString(),
+                trip.optString("recommendation")
+            )
+            csv.append(values.joinToString(";") { csvCell(it) }).append("\r\n")
+        }
+
+        try {
+            contentResolver.openOutputStream(uri)?.use { output ->
+                // BOM UTF-8 para mejorar la detección de acentos en Excel.
+                output.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
+                output.write(csv.toString().toByteArray(StandardCharsets.UTF_8))
+            } ?: throw IllegalStateException("No se pudo abrir el archivo")
+            Toast.makeText(this, "Historial exportado correctamente a CSV.", Toast.LENGTH_LONG).show()
+        } catch (error: Exception) {
+            Toast.makeText(this, "No se pudo guardar el CSV: ${error.localizedMessage ?: "error de escritura"}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun csvCell(value: String): String {
+        val escaped = value.replace("\"", "\"\"")
+        return if (escaped.contains(';') || escaped.contains('"') ||
+            escaped.contains('\n') || escaped.contains('\r')
+        ) "\"$escaped\"" else escaped
     }
 
     private fun confirmClearHistory() {
