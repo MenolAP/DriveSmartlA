@@ -69,6 +69,12 @@ class MainActivity : Activity() {
         field(page, "Ganancia mínima deseada por km total (CLP/km)", "objetivoKm", "300")
 
         page.addView(Button(this).apply {
+            text = "Guardar configuración habitual"
+            isAllCaps = false
+            setOnClickListener { saveVehicleConfiguration() }
+        }, params().apply { topMargin = dp(4); bottomMargin = dp(8) })
+
+        page.addView(Button(this).apply {
             text = "Calcular rentabilidad"
             isAllCaps = false
             setOnClickListener { calculate() }
@@ -126,9 +132,10 @@ class MainActivity : Activity() {
             textSize = 14f
             setTextColor(0xFF252B36.toInt())
         })
+        val savedConfig = preferences.getString("vehicle_config_$key", null)
         val input = EditText(this).apply {
             setSingleLine(true)
-            setText(initial)
+            setText(savedConfig ?: initial)
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
             hint = "0"
             contentDescription = label
@@ -138,6 +145,48 @@ class MainActivity : Activity() {
             topMargin = dp(2)
             bottomMargin = dp(10)
         })
+    }
+
+    private fun saveVehicleConfiguration() {
+        val keys = listOf(
+            "rendimiento", "precio", "comision",
+            "mantencionKm", "depreciacionKm", "objetivoKm"
+        )
+        val values = keys.associateWith { key ->
+            inputs[key]?.text?.toString()?.trim().orEmpty()
+        }
+
+        fun parseValue(raw: String): Double? {
+            if (raw.isBlank()) return null
+            val normalized = if (raw.contains(',') && !raw.contains('.')) {
+                raw.replace(',', '.')
+            } else {
+                raw.replace(",", "")
+            }
+            return normalized.toDoubleOrNull()?.takeIf { it.isFinite() }
+        }
+
+        for (key in keys) {
+            val value = parseValue(values[key].orEmpty())
+            if (value == null || value < 0 ||
+                (key == "rendimiento" && value <= 0) ||
+                (key == "comision" && value > 100)
+            ) {
+                Toast.makeText(
+                    this,
+                    "Revisa la configuración: rendimiento mayor que cero y comisión entre 0 y 100%.",
+                    Toast.LENGTH_LONG
+                ).show()
+                return
+            }
+        }
+
+        val editor = preferences.edit()
+        for (key in keys) {
+            editor.putString("vehicle_config_$key", values[key])
+        }
+        editor.apply()
+        Toast.makeText(this, "Configuración habitual guardada en este teléfono.", Toast.LENGTH_SHORT).show()
     }
 
     private fun calculate() {
