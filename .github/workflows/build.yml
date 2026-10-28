@@ -26,7 +26,7 @@ jobs:
           echo "android { namespace 'com.drivesmart.ia'; compileSdk 34; defaultConfig { applicationId 'com.drivesmart.ia'; minSdk 26; targetSdk 34; versionCode 1; versionName '1.0' } }" >> app/build.gradle
           echo "dependencies { implementation 'androidx.core:core-ktx:1.12.0'; implementation 'androidx.appcompat:appcompat:1.6.1'; implementation 'com.google.android.material:material:1.11.0' }" >> app/build.gradle
 
-          # Crear settings.gradle con repositorios de plugins
+          # Crear settings.gradle con la gestión de repositorios centralizada
           cat << 'EOF' > settings.gradle
           pluginManagement {
               repositories {
@@ -45,22 +45,12 @@ jobs:
           include ':app'
           EOF
 
-          # Crear build.gradle raíz clásico compatible
+          # Crear build.gradle raíz limpio sin repositorios redundantes
           cat << 'EOF' > build.gradle
           buildscript {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
               dependencies {
                   classpath 'com.android.tools.build:gradle:8.1.1'
                   classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0"
-              }
-          }
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
               }
           }
           EOF
