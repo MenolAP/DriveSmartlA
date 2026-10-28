@@ -15,6 +15,8 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.TextView
 import org.json.JSONObject
+import java.text.NumberFormat
+import java.util.Locale
 
 /**
  * Floating quick-access bubble and best-effort inDrive offer reader.
@@ -111,19 +113,60 @@ class OfferAccessibilityService : AccessibilityService() {
         if (signature == lastSignature && now - lastDetectedAt < 15000L) return
         lastSignature = signature
         lastDetectedAt = now
-        getSharedPreferences("drivesmart_history", MODE_PRIVATE).edit()
+        val prefs = getSharedPreferences("drivesmart_history", MODE_PRIVATE)
+        val suggestedFare = if (distances.size >= 2) calculateMinimumFare(kmEmpty + kmPassenger) else null
+        prefs.edit()
             .putString("detected_offer", JSONObject().apply {
                 put("fare", fare)
                 put("kmEmpty", kmEmpty)
                 put("kmPassenger", kmPassenger)
                 put("distanceCount", distances.size)
+                if (suggestedFare != null) put("suggestedMinFare", suggestedFare)
                 put("sourcePackage", packageName)
                 put("detectedAt", now)
             }.toString())
             .apply()
-        bubble?.text = "DS\\n" + 36.toChar() + fare
+        bubble?.apply {
+            text = if (suggestedFare != null) {
+                "MIN\n" + NumberFormat.getNumberInstance(Locale("es", "CL")).format(suggestedFare)
+            } else {
+                "MIN\n?"
+            }
+            contentDescription = if (suggestedFare != null) {
+                "Tarifa mínima sugerida ${suggestedFare} pesos. Toca para ver la oferta."
+            } else {
+                "No se pudo calcular la tarifa mínima: falta detectar las dos distancias."
+            }
+        }
     }
 
+    private fun calculateMinimumFare(totalKm: Double): Long? {
+        if (!totalKm.isFinite() || totalKm <= 0.0) return null
+        val prefs = getSharedPreferences("drivesmart_history", MODE_PRIVATE)
+        fun config(key: String, fallback: Double): Double {
+            val raw = prefs.getString("vehicle_config_$key", null) ?: return fallback
+            val normalized = if (raw.contains(',') && !raw.contains('.')) raw.replace(',', '.') else raw.replace(",", "")
+            return normalized.toDoubleOrNull()?.takeIf { it.isFinite() } ?: fallback
+        }
+        val efficiency = config("rendimiento", 13.0)
+        val fuelPrice = config("precio", 1300.0)
+        val commissionPercent = config("comision", 10.0)
+        val tolls = config("peajes", 0.0)
+        val maintenancePerKm = config("mantencionKm", 0.0)
+        val depreciationPerKm = config("depreciacionKm", 0.0)
+        val others = config("otros", 0.0)
+        val targetPerKm = config("objetivoKm", 300.0)
+        if (efficiency <= 0.0 || commissionPercent < 0.0 || commissionPercent >= 100.0 ||
+            fuelPrice < 0.0 || tolls < 0.0 || maintenancePerKm < 0.0 ||
+            depreciationPerKm < 0.0 || others < 0.0 || targetPerKm < 0.0
+        ) return null
+        val fuelCost = totalKm / efficiency * fuelPrice
+        val baseCosts = fuelCost + totalKm * maintenancePerKm + totalKm * depreciationPerKm + tolls + others
+        val desiredNet = totalKm * targetPerKm
+        val fare = (baseCosts + desiredNet) / (1.0 - commissionPercent / 100.0)
+        if (!fare.isFinite() || fare < 0.0 || fare > Long.MAX_VALUE.toDouble()) return null
+        return kotlin.math.ceil(fare).toLong()
+    }
     private fun appendTreeText(node: android.view.accessibility.AccessibilityNodeInfo, out: StringBuilder, depth: Int) {
         if (depth > 9) return
         node.text?.let { out.append(it).append(' ') }
@@ -181,8 +224,8 @@ class OfferAccessibilityService : AccessibilityService() {
     private fun showBubble() {
         if (bubble != null) return
         val view = TextView(this).apply {
-            text = "DS\\n?"
-            textSize = 13f
+            text = "MIN\\n?"
+            textSize = 10f
             gravity = Gravity.CENTER
             setTextColor(0xFFFFFFFF.toInt())
             background = GradientDrawable().apply {
@@ -204,7 +247,7 @@ class OfferAccessibilityService : AccessibilityService() {
 
         val prefs = getSharedPreferences("drivesmart_history", MODE_PRIVATE)
         val params = WindowManager.LayoutParams(
-            dp(58), dp(58),
+            dp(72), dp(72),
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
