@@ -174,6 +174,69 @@ class MainActivity : Activity() {
             setTextColor(0xFF606875.toInt())
             setPadding(0, dp(14), 0, 0)
         })
+        // Pulido visual general: tarjeta de cabecera, botones coherentes y campos legibles.
+        page.setPadding(dp(16), dp(16), dp(16), dp(24))
+        for (index in 0 until page.childCount) {
+            when (val child = page.getChildAt(index)) {
+                is Button -> {
+                    val label = child.text.toString()
+                    val color = when {
+                        label.contains("Calcular rentabilidad", ignoreCase = true) -> 0xFF087F5B.toInt()
+                        label.contains("Decisión rápida", ignoreCase = true) -> 0xFFB45309.toInt()
+                        else -> 0xFF17324D.toInt()
+                    }
+                    child.background = android.graphics.drawable.GradientDrawable().apply {
+                        shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                        cornerRadius = dp(14).toFloat()
+                        setColor(color)
+                    }
+                    child.setTextColor(0xFFFFFFFF.toInt())
+                    child.textSize = 15f
+                    child.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+                    child.setPadding(dp(14), dp(12), dp(14), dp(12))
+                    child.minHeight = dp(48)
+                }
+                is EditText -> {
+                    child.background = android.graphics.drawable.GradientDrawable().apply {
+                        shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                        cornerRadius = dp(12).toFloat()
+                        setColor(0xFFFFFFFF.toInt())
+                        setStroke(dp(1), 0xFFD5DDE7.toInt())
+                    }
+                    child.setPadding(dp(12), dp(10), dp(12), dp(10))
+                    child.textSize = 16f
+                }
+            }
+        }
+        page.getChildAt(0)?.let { header ->
+            header.background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                cornerRadius = dp(18).toFloat()
+                setColor(0xFF102A43.toInt())
+            }
+            header.setPadding(dp(16), dp(18), dp(16), dp(18))
+        }
+        (page.getChildAt(0) as? TextView)?.apply {
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 28f
+            setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+        }
+        (page.getChildAt(2) as? TextView)?.apply {
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                cornerRadius = dp(12).toFloat()
+                setColor(0xFFE7EEF6.toInt())
+            }
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+        }
+        result.background = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+            cornerRadius = dp(16).toFloat()
+            setColor(0xFFFFFFFF.toInt())
+            setStroke(dp(1), 0xFFD5DDE7.toInt())
+        }
+        result.setPadding(dp(16), dp(16), dp(16), dp(16))
+        result.textSize = 15f
         setContentView(scroll)
         handleDetectedOffer(intent)
     }
