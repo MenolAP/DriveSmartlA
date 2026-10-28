@@ -96,6 +96,12 @@ class MainActivity : Activity() {
         }, params())
 
         page.addView(Button(this).apply {
+            text = "Decisión rápida: aceptar o rechazar"
+            isAllCaps = false
+            setOnClickListener { showQuickDecision() }
+        }, params().apply { topMargin = dp(8); bottomMargin = dp(4) })
+
+        page.addView(Button(this).apply {
             text = if (preferences.getBoolean(OfferAccessibilityService.PREF_BUBBLE_ENABLED, true))
                 "Desactivar botón flotante" else "Activar botón flotante"
             isAllCaps = false
@@ -434,6 +440,51 @@ class MainActivity : Activity() {
         saveButton.isEnabled = true
     }
 
+    private fun showQuickDecision() {
+        calculate()
+        val trip = latestTrip
+        if (trip == null) {
+            AlertDialog.Builder(this).setTitle("Decisión rápida")
+                .setMessage("No puedo evaluar la oferta con estos datos. Revisa tarifa, kilómetros, tiempo y configuración del vehículo.")
+                .setPositiveButton("Revisar datos", null).show()
+            return
+        }
+        val net = trip.optDouble("net")
+        val perKm = trip.optDouble("perKm")
+        val profitPerHour = if (trip.isNull("profitPerHour")) Double.NaN else trip.optDouble("profitPerHour")
+        val targetPerKm = trip.optDouble("targetPerKm")
+        val targetPerHour = trip.optDouble("targetPerHour")
+        val totalKm = trip.optDouble("totalKm")
+        val minutes = trip.optDouble("minutes")
+        val viableFare = trip.optDouble("viableFare", Double.NaN)
+        val decision = when {
+            totalKm <= 0.0 -> "NO EVALUABLE"
+            net <= 0.0 -> "RECHAZAR"
+            perKm < targetPerKm -> "RECHAZAR O NEGOCIAR"
+            minutes <= 0.0 -> "REVISAR: FALTA EL TIEMPO"
+            !profitPerHour.isFinite() || profitPerHour < targetPerHour -> "RECHAZAR O NEGOCIAR"
+            else -> "ACEPTAR SEGÚN TUS OBJETIVOS"
+        }
+        val explanation = when {
+            totalKm <= 0.0 -> "Introduce kilómetros totales mayores que cero."
+            net <= 0.0 -> "La tarifa no cubre los costos estimados."
+            perKm < targetPerKm -> "La ganancia por kilómetro queda bajo tu mínimo."
+            minutes <= 0.0 -> "Ingresa el tiempo total, incluido el trayecto de recogida."
+            !profitPerHour.isFinite() || profitPerHour < targetPerHour -> "La ganancia por hora queda bajo tu objetivo."
+            else -> "La oferta supera los mínimos configurados por kilómetro y por hora."
+        }
+        val hourly = if (profitPerHour.isFinite()) money.format(profitPerHour) else "No calculable"
+        val fareTarget = if (viableFare.isFinite()) money.format(kotlin.math.ceil(viableFare)) else "No calculable"
+        val detail = "Ganancia neta estimada: ${money.format(net)}\\n" +
+            "Ganancia por km total: ${money.format(perKm)} (mínimo ${money.format(targetPerKm)})\\n" +
+            "Ganancia por hora: $hourly (objetivo ${money.format(targetPerHour)}/h)\\n" +
+            "Tarifa mínima para tus objetivos: $fareTarget\\n\\n" +
+            explanation + "\\n\\nEs una estimación: confirma distancia, tiempo, comisión, peajes y costos reales."
+        AlertDialog.Builder(this).setTitle(decision).setMessage(detail)
+            .setPositiveButton("Volver a la oferta", null)
+            .setNeutralButton("Ver cálculo completo") { _, _ -> result.requestFocus() }
+            .show()
+    }
     private fun saveCurrentTrip() {
         val trip = latestTrip
         if (trip == null) {
