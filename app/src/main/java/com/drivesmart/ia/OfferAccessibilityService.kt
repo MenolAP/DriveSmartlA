@@ -131,9 +131,9 @@ class OfferAccessibilityService : AccessibilityService() {
             .apply()
         bubble?.apply {
             text = if (suggestedFare != null) {
-                "MIN\n" + NumberFormat.getNumberInstance(Locale("es", "CL")).format(suggestedFare)
+                "$" + NumberFormat.getNumberInstance(Locale("es", "CL")).format(suggestedFare) + "\nTARIFA MÍNIMA"
             } else {
-                "MIN\n?"
+                "TARIFA MÍNIMA\nFALTAN DATOS"
             }
             contentDescription = if (suggestedFare != null) {
                 "Tarifa mínima sugerida ${suggestedFare} pesos. Toca para ver la oferta."
@@ -231,7 +231,7 @@ class OfferAccessibilityService : AccessibilityService() {
     private fun showBubble() {
         if (bubble != null) return
         val view = TextView(this).apply {
-            text = "TARIFA MÍN.\\nDetectando…"
+            text = "TARIFA MÍN.\nDetectando…"
             textSize = 13f
             setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
             gravity = Gravity.CENTER
