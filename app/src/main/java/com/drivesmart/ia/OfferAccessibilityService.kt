@@ -140,8 +140,8 @@ class OfferAccessibilityService : AccessibilityService() {
 
     private fun extractFare(text: String): Long? {
         val patterns = listOf(
-            Regex("(?:CLP|\\\\$)\\\\s*([0-9][0-9., ]{2,})", RegexOption.IGNORE_CASE),
-            Regex("(?:tarifa|precio|ganas|recibes)\\\\D{0,12}([0-9][0-9., ]{2,})", RegexOption.IGNORE_CASE)
+            Regex("(?:CLP|\\$)\\s*([0-9][0-9., ]{2,})", RegexOption.IGNORE_CASE),
+            Regex("(?:tarifa|precio|ganas|recibes)\\D{0,12}([0-9][0-9., ]{2,})", RegexOption.IGNORE_CASE)
         )
         for (pattern in patterns) {
             val raw = pattern.find(text)?.groupValues?.getOrNull(1) ?: continue
@@ -156,10 +156,10 @@ class OfferAccessibilityService : AccessibilityService() {
         val normalized = text
             .replace('·', ' ')
             .replace('|', ' ')
-            .replace(Regex("\\\\s+"), " ")
+            .replace(Regex("\\s+"), " ")
         val patterns = listOf(
-            Regex("([0-9]+(?:[.,][0-9]+)?)\\\\s*(?:km\\\\b|kil[oó]metros?\\\\b)", RegexOption.IGNORE_CASE),
-            Regex("\\\\bkm\\\\s*([0-9]+(?:[.,][0-9]+)?)", RegexOption.IGNORE_CASE)
+            Regex("([0-9]+(?:[.,][0-9]+)?)\\s*(?:km\\b|kil[oó]metros?\\b)", RegexOption.IGNORE_CASE),
+            Regex("\\bkm\\s*([0-9]+(?:[.,][0-9]+)?)", RegexOption.IGNORE_CASE)
         )
         val found = mutableListOf<Double>()
         for (pattern in patterns) {
