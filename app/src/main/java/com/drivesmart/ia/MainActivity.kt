@@ -161,14 +161,18 @@ class MainActivity : Activity() {
         try {
             val offer = JSONObject(raw)
             val fare = offer.optLong("fare", 0L)
-            val km = offer.optDouble("km", 0.0)
-            if (fare > 0 && km > 0) {
+            val separated = offer.has("kmEmpty") && offer.has("kmPassenger")
+            val kmEmpty = if (separated) offer.optDouble("kmEmpty", 0.0) else 0.0
+            val kmPassenger = if (separated) offer.optDouble("kmPassenger", 0.0) else offer.optDouble("km", 0.0)
+            val distanceCount = offer.optInt("distanceCount", if (separated) 2 else 1)
+            if (fare > 0 && (kmEmpty > 0 || kmPassenger > 0)) {
                 inputs["tarifa"]?.setText(fare.toString())
-                inputs["km"]?.setText(km.toString())
-                inputs["kmVacio"]?.setText("0")
+                inputs["km"]?.setText(kmPassenger.toString())
+                inputs["kmVacio"]?.setText(kmEmpty.toString())
                 calculate()
-                Toast.makeText(this, "Oferta detectada: revisa los datos y la tarifa mínima sugerida.", Toast.LENGTH_LONG).show()
-            } else Toast.makeText(this, "Oferta incompleta; revisa los datos manualmente.", Toast.LENGTH_LONG).show()
+                val note = if (distanceCount < 2) "Solo se detectó una distancia; comprueba ambos recuadros antes de decidir." else "Oferta detectada: azul = sin pasajero; verde = con pasajero. Revisa la tarifa sugerida."
+                Toast.makeText(this, note, Toast.LENGTH_LONG).show()
+            } else Toast.makeText(this, "Oferta incompleta; revisa tarifa y ambos recuadros de kilómetros manualmente.", Toast.LENGTH_LONG).show()
         } catch (_: Exception) { Toast.makeText(this, "No se pudo interpretar la oferta; ingrésala manualmente.", Toast.LENGTH_LONG).show() }
         intent.removeExtra("open_offer_assistant")
     }
