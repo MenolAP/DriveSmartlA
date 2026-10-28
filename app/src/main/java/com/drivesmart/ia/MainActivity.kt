@@ -342,7 +342,8 @@ class MainActivity : Activity() {
         }
 
         val totalKm = kmPassengerValue + kmEmptyValue
-        val fuelCost = (totalKm / efficiencyValue) * fuelPriceValue
+        val fuelLiters = totalKm / efficiencyValue
+        val fuelCost = fuelLiters * fuelPriceValue
         val commissionCost = fareValue * commissionPercentValue / 100.0
         val maintenanceCost = totalKm * maintenancePerKmValue
         val depreciationCost = totalKm * depreciationPerKmValue
@@ -350,13 +351,18 @@ class MainActivity : Activity() {
         val net = fareValue - totalCosts
         val margin = if (fareValue > 0) net / fareValue * 100.0 else 0.0
         val perKm = if (totalKm > 0) net / totalKm else 0.0
+        val costPerKm = if (totalKm > 0) totalCosts / totalKm else 0.0
+        val emptyKmPercent = if (totalKm > 0) kmEmptyValue / totalKm * 100.0 else 0.0
         val baseCostsWithoutCommission = fuelCost + tollsValue + maintenanceCost + depreciationCost + othersValue
+        val breakEvenFare = if (commissionPercentValue < 100.0) {
+            baseCostsWithoutCommission / (1.0 - commissionPercentValue / 100.0)
+        } else Double.POSITIVE_INFINITY
         val viableFare = if (commissionPercentValue < 100.0) {
             (baseCostsWithoutCommission + targetPerKmValue * totalKm) / (1.0 - commissionPercentValue / 100.0)
         } else Double.POSITIVE_INFINITY
         val recommendation = when {
-            net <= 0 -> "NO CONVIENE: la ganancia estimada no es positiva."
             totalKm <= 0 -> "NO SE PUEDE EVALUAR: introduce kilómetros mayores que cero."
+            net <= 0 -> "NO CONVIENE: la ganancia estimada no es positiva."
             perKm < targetPerKmValue -> "BAJO TU OBJETIVO: revisa la tarifa, distancia o costos."
             else -> "CUMPLE TU OBJETIVO: alcanza tu mínimo de ganancia por km."
         }
@@ -365,18 +371,22 @@ class MainActivity : Activity() {
             "Tarifa del viaje: ${money.format(fareValue)}\n" +
             "Distancia con pasajero: ${decimal.format(kmPassengerValue)} km\n" +
             "Distancia sin pasajero: ${decimal.format(kmEmptyValue)} km\n" +
-            "Distancia total considerada: ${decimal.format(totalKm)} km\n\n" +
+            "Distancia total considerada: ${decimal.format(totalKm)} km\n" +
+            "Kilómetros sin pasajero: ${decimal.format(emptyKmPercent)}% del recorrido\n\n" +
+            "Combustible estimado: ${decimal.format(fuelLiters)} litros\n" +
             "Combustible: ${money.format(fuelCost)}\n" +
             "Comisión plataforma: ${money.format(commissionCost)}\n" +
             "Peajes: ${money.format(tollsValue)}\n" +
             "Mantención/neumáticos: ${money.format(maintenanceCost)}\n" +
             "Depreciación: ${money.format(depreciationCost)}\n" +
             "Otros costos: ${money.format(othersValue)}\n" +
-            "Costos considerados: ${money.format(totalCosts)}\n\n" +
+            "Costos considerados: ${money.format(totalCosts)}\n" +
+            "Costo real estimado por km total: ${money.format(costPerKm)}\n\n" +
             "GANANCIA ESTIMADA: ${money.format(net)}\n" +
             "Ganancia por km total: ${money.format(perKm)}\n" +
             "Objetivo mínimo: ${money.format(targetPerKmValue)} por km\n" +
-            "TARIFA MÍNIMA SUGERIDA: ${if (viableFare.isFinite()) money.format(kotlin.math.ceil(viableFare)) else "No calculable con comisión del 100%"}\n" +
+            "TARIFA DE EQUILIBRIO (cubrir costos): ${if (breakEvenFare.isFinite()) money.format(kotlin.math.ceil(breakEvenFare)) else "No calculable con comisión del 100%"}\n" +
+            "TARIFA MÍNIMA PARA TU OBJETIVO: ${if (viableFare.isFinite()) money.format(kotlin.math.ceil(viableFare)) else "No calculable con comisión del 100%"}\n" +
             "Evaluación del viaje: ${recommendation}\n" +
             "Margen sobre la tarifa: ${decimal.format(margin)}%"
 
@@ -386,7 +396,12 @@ class MainActivity : Activity() {
             put("kmPassenger", kmPassengerValue)
             put("kmEmpty", kmEmptyValue)
             put("totalKm", totalKm)
+            put("fuelLiters", fuelLiters)
             put("fuelCost", fuelCost)
+            put("costPerKm", costPerKm)
+            put("emptyKmPercent", emptyKmPercent)
+            put("breakEvenFare", breakEvenFare)
+            put("viableFare", viableFare)
             put("commissionCost", commissionCost)
             put("tolls", tollsValue)
             put("maintenanceCost", maintenanceCost)
