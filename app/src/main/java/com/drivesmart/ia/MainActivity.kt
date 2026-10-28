@@ -81,6 +81,7 @@ class MainActivity : Activity() {
         field(page, "Otros costos adicionales (CLP)", "otros", "0")
         section(page, "Objetivo de rentabilidad")
         field(page, "Ganancia mínima deseada por km total (CLP/km)", "objetivoKm", "300")
+        field(page, "Ganancia mínima deseada por hora (CLP/h)", "objetivoHora", "5000")
 
         page.addView(Button(this).apply {
             text = "Guardar configuración habitual"
@@ -221,7 +222,7 @@ class MainActivity : Activity() {
         })
         val configKeys = setOf(
             "rendimiento", "precio", "comision", "peajes",
-            "mantencionKm", "depreciacionKm", "otros", "objetivoKm"
+            "mantencionKm", "depreciacionKm", "otros", "objetivoKm", "objetivoHora"
         )
         val preferenceKey = "vehicle_config_$key"
         val savedConfig = preferences.getString(preferenceKey, null)
@@ -313,9 +314,10 @@ class MainActivity : Activity() {
         val depreciationPerKm = number("depreciacionKm")
         val others = number("otros")
         val targetPerKm = number("objetivoKm")
+        val targetPerHour = number("objetivoHora")
         val values = listOf(
             fare, kmPassenger, kmEmpty, minutes, efficiency, fuelPrice, commissionPercent,
-            tolls, maintenancePerKm, depreciationPerKm, others, targetPerKm
+            tolls, maintenancePerKm, depreciationPerKm, others, targetPerKm, targetPerHour
         )
 
         if (values.any { it == null || !it.isFinite() }) {
@@ -334,11 +336,12 @@ class MainActivity : Activity() {
         val depreciationPerKmValue = depreciationPerKm ?: return
         val othersValue = others ?: return
         val targetPerKmValue = targetPerKm ?: return
+        val targetPerHourValue = targetPerHour ?: return
 
         if (fareValue < 0 || kmPassengerValue < 0 || kmEmptyValue < 0 || minutesValue < 0 || efficiencyValue <= 0 ||
             fuelPriceValue < 0 || commissionPercentValue < 0 || commissionPercentValue > 100 ||
             tollsValue < 0 || maintenancePerKmValue < 0 || depreciationPerKmValue < 0 ||
-            othersValue < 0 || targetPerKmValue < 0
+            othersValue < 0 || targetPerKmValue < 0 || targetPerHourValue < 0
         ) {
             result.text = "Revisa los valores: no pueden ser negativos, el rendimiento debe ser mayor que cero y la comisión debe estar entre 0 y 100%."
             return
@@ -361,14 +364,18 @@ class MainActivity : Activity() {
         val breakEvenFare = if (commissionPercentValue < 100.0) {
             baseCostsWithoutCommission / (1.0 - commissionPercentValue / 100.0)
         } else Double.POSITIVE_INFINITY
+        val targetNetByKm = targetPerKmValue * totalKm
+        val targetNetByHour = if (minutesValue > 0) targetPerHourValue * (minutesValue / 60.0) else 0.0
+        val requiredNet = maxOf(targetNetByKm, targetNetByHour)
         val viableFare = if (commissionPercentValue < 100.0) {
-            (baseCostsWithoutCommission + targetPerKmValue * totalKm) / (1.0 - commissionPercentValue / 100.0)
+            (baseCostsWithoutCommission + requiredNet) / (1.0 - commissionPercentValue / 100.0)
         } else Double.POSITIVE_INFINITY
         val recommendation = when {
             totalKm <= 0 -> "NO SE PUEDE EVALUAR: introduce kilómetros mayores que cero."
             net <= 0 -> "NO CONVIENE: la ganancia estimada no es positiva."
-            perKm < targetPerKmValue -> "BAJO TU OBJETIVO: revisa la tarifa, distancia o costos."
-            else -> "CUMPLE TU OBJETIVO: alcanza tu mínimo de ganancia por km."
+            perKm < targetPerKmValue -> "REVISAR / NO ACEPTAR AÚN: no alcanza tu mínimo por km."
+            minutesValue > 0 && profitPerHour < targetPerHourValue -> "REVISAR: cumple por km, pero no alcanza tu mínimo por hora."
+            else -> "CUMPLE TUS OBJETIVOS: alcanza los mínimos configurados por km y por hora."
         }
 
         result.text = "RESULTADO ESTIMADO\n\n" +
@@ -390,9 +397,9 @@ class MainActivity : Activity() {
             "GANANCIA ESTIMADA: ${money.format(net)}\n" +
             "Ganancia por km total: ${money.format(perKm)}\n" +
             "Ganancia estimada por hora: ${if (profitPerHour.isFinite()) money.format(profitPerHour) else "No calculable: introduce minutos mayores que cero"}\n" +
-            "Objetivo mínimo: ${money.format(targetPerKmValue)} por km\n" +
+            "Objetivo mínimo: ${money.format(targetPerKmValue)} por km\\n" +\n            "Objetivo mínimo por hora: ${money.format(targetPerHourValue)}/h\n" +
             "TARIFA DE EQUILIBRIO (cubrir costos): ${if (breakEvenFare.isFinite()) money.format(kotlin.math.ceil(breakEvenFare)) else "No calculable con comisión del 100%"}\n" +
-            "TARIFA MÍNIMA PARA TU OBJETIVO: ${if (viableFare.isFinite()) money.format(kotlin.math.ceil(viableFare)) else "No calculable con comisión del 100%"}\n" +
+            "TARIFA MÍNIMA PARA TUS OBJETIVOS: ${if (viableFare.isFinite()) money.format(kotlin.math.ceil(viableFare)) else "No calculable con comisión del 100%"}\n" +
             "Evaluación del viaje: ${recommendation}\n" +
             "Margen sobre la tarifa: ${decimal.format(margin)}%"
 
@@ -420,6 +427,7 @@ class MainActivity : Activity() {
             put("perKm", perKm)
             put("margin", margin)
             put("targetPerKm", targetPerKmValue)
+            put("targetPerHour", targetPerHourValue)
             put("recommendation", recommendation)
         }
         saveButton.isEnabled = true
