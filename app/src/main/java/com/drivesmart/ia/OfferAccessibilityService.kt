@@ -44,6 +44,10 @@ class OfferAccessibilityService : AccessibilityService() {
     private var emptyKmInput: EditText? = null
     private var passengerKmInput: EditText? = null
     private var minimumFareLabel: TextView? = null
+    private var panelDragStartX = 0f
+    private var panelDragStartY = 0f
+    private var panelStartWindowX = 0
+    private var panelStartWindowY = 0
     private var receiverRegistered = false
     private var lastSignature = ""
     private var lastDetectedAt = 0L
@@ -346,7 +350,7 @@ class OfferAccessibilityService : AccessibilityService() {
         }
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(12), dp(14), dp(12))
+            setPadding(dp(10), dp(8), dp(10), dp(8))
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = dp(16).toFloat()
@@ -366,7 +370,7 @@ class OfferAccessibilityService : AccessibilityService() {
             text = "Ingresa los kilómetros de todo el trayecto"
             textSize = 12f
             setTextColor(0xFFD8E5F0.toInt())
-            setPadding(0, dp(4), 0, dp(8))
+            setPadding(0, dp(2), 0, dp(4))
         })
         fun makeKmInput(label: String, value: Double): EditText {
             return EditText(this).apply {
@@ -393,7 +397,7 @@ class OfferAccessibilityService : AccessibilityService() {
             textSize = 11f
             setTextColor(0xFFFFC857.toInt())
         })
-        panel.addView(emptyInput, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(8) })
+        panel.addView(emptyInput, LinearLayout.LayoutParams(-1, dp(40)).apply { bottomMargin = dp(5) })
         panel.addView(TextView(this).apply {
             text = "KM CON PASAJERO"
             textSize = 11f
@@ -402,11 +406,11 @@ class OfferAccessibilityService : AccessibilityService() {
         panel.addView(passengerInput, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(8) })
         val minimum = TextView(this).apply {
             text = "Tarifa mínima: ingresa ambas distancias"
-            textSize = 17f
+            textSize = 15f
             setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
             setTextColor(0xFFFFFFFF.toInt())
             gravity = Gravity.CENTER
-            setPadding(0, dp(8), 0, dp(10))
+            setPadding(0, dp(5), 0, dp(6))
         }
         minimumFareLabel = minimum
         panel.addView(minimum, LinearLayout.LayoutParams(-1, -2))
@@ -415,7 +419,7 @@ class OfferAccessibilityService : AccessibilityService() {
             text = "Cerrar"
             isAllCaps = false
             setOnClickListener { hideKmPanel() }
-        }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { rightMargin = dp(6) })
+        }, LinearLayout.LayoutParams(0, dp(36), 1f).apply { rightMargin = dp(5) })
         actions.addView(Button(this).apply {
             text = "Abrir app"
             isAllCaps = false
@@ -427,10 +431,10 @@ class OfferAccessibilityService : AccessibilityService() {
                     putExtra("detected_offer", current)
                 })
             }
-        }, LinearLayout.LayoutParams(0, dp(44), 1f))
+        }, LinearLayout.LayoutParams(0, dp(36), 1f))
         panel.addView(actions)
         val params = WindowManager.LayoutParams(
-            dp(280), WindowManager.LayoutParams.WRAP_CONTENT,
+            dp(250), WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
@@ -438,6 +442,24 @@ class OfferAccessibilityService : AccessibilityService() {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             y = dp(110)
             softInputMode = android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        }
+        panel.setOnTouchListener { _, event ->
+            when (event.action) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    panelDragStartX = event.rawX
+                    panelDragStartY = event.rawY
+                    panelStartWindowX = params.x
+                    panelStartWindowY = params.y
+                    true
+                }
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    params.x = panelStartWindowX + (event.rawX - panelDragStartX).toInt()
+                    params.y = (panelStartWindowY + (event.rawY - panelDragStartY).toInt()).coerceAtLeast(dp(8))
+                    try { windowManager?.updateViewLayout(panel, params) } catch (_: Exception) {}
+                    true
+                }
+                else -> false
+            }
         }
         val watcher = object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
