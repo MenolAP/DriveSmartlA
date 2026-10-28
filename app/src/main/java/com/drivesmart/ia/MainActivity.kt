@@ -57,17 +57,23 @@ class MainActivity : Activity() {
         page.addView(TextView(this).apply {
             text = "Rentabilidad real estimada para viajes inDrive (CLP)"
             textSize = 16f
-            setPadding(0, dp(8), 0, dp(18))
+            setPadding(0, dp(8), 0, dp(8))
+        })
+        page.addView(TextView(this).apply {
+            text = "Perfil inicial: Hyundai Grand i10 · gasolina 93 · rendimiento estimado 13 km/l. El precio por litro es solo un valor de partida: cámbialo por el precio real que pagas."
+            textSize = 13f
+            setTextColor(0xFF606875.toInt())
+            setPadding(0, 0, 0, dp(18))
         })
 
         field(page, "Tarifa del viaje (CLP)", "tarifa", "5000")
         field(page, "Kilómetros con pasajero (km)", "km", "8")
         field(page, "Kilómetros sin pasajero (km)", "kmVacio", "0")
-        field(page, "Rendimiento del vehículo (km/l)", "rendimiento", "14")
+        field(page, "Rendimiento del vehículo (km/l)", "rendimiento", "13")
         field(page, "Precio del combustible (CLP/l)", "precio", "1300")
 
         section(page, "Comisión y costos del vehículo")
-        field(page, "Comisión de la plataforma (%)", "comision", "0")
+        field(page, "Comisión de la plataforma (%)", "comision", "10")
         field(page, "Peajes del viaje (CLP)", "peajes", "0")
         field(page, "Mantención y neumáticos por km (CLP/km)", "mantencionKm", "0")
         field(page, "Depreciación por km (CLP/km)", "depreciacionKm", "0")
@@ -155,7 +161,7 @@ class MainActivity : Activity() {
         }
         page.addView(result, params().apply { topMargin = dp(14) })
         page.addView(TextView(this).apply {
-            text = "Los valores de comisión, mantención y depreciación comienzan en cero: introduce tus costos reales. Los kilómetros sin pasajero también consumen combustible y generan desgaste. El historial se guarda localmente en este teléfono. El resultado es una estimación, no una garantía de ganancia."
+            text = "Perfil base: Hyundai Grand i10 con gasolina 93 y rendimiento estimado de 13 km/l; comisión inicial estimada del 10%. Verifica el precio real por litro y la comisión que te aplica inDrive. Mantención, depreciación y demás costos comienzan en cero: introduce tus costos reales. Los kilómetros sin pasajero también consumen combustible y generan desgaste. El historial se guarda localmente en este teléfono. El resultado es una estimación, no una garantía de ganancia."
             textSize = 12f
             setTextColor(0xFF606875.toInt())
             setPadding(0, dp(14), 0, 0)
