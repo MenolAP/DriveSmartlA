@@ -31,14 +31,26 @@ class OfferAccessibilityService : AccessibilityService() {
         if (packageName == packageNameForOwnApp()) return
         val source = packageName.lowercase()
         if (!source.contains("indriver") && !source.contains("indrive")) return
+        // event.source is often only the single changed widget. Read the active
+        // window first so sibling widgets (including the green passenger distance)
+        // are not missed when inDrive emits separate accessibility events.
         val text = buildString {
             event.text.forEach { append(it).append(' ') }
             event.contentDescription?.let { append(it).append(' ') }
-            event.source?.let { node ->
+            val root = rootInActiveWindow
+            if (root != null) {
                 try {
-                    appendTreeText(node, this, 0)
+                    appendTreeText(root, this, 0)
                 } finally {
-                    node.recycle()
+                    root.recycle()
+                }
+            } else {
+                event.source?.let { node ->
+                    try {
+                        appendTreeText(node, this, 0)
+                    } finally {
+                        node.recycle()
+                    }
                 }
             }
         }
@@ -70,10 +82,10 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private fun appendTreeText(node: android.view.accessibility.AccessibilityNodeInfo, out: StringBuilder, depth: Int) {
-        if (depth > 5) return
+        if (depth > 9) return
         node.text?.let { out.append(it).append(' ') }
         node.contentDescription?.let { out.append(it).append(' ') }
-        for (i in 0 until minOf(node.childCount, 35)) {
+        for (i in 0 until minOf(node.childCount, 60)) {
             val child = node.getChild(i) ?: continue
             try { appendTreeText(child, out, depth + 1) } finally { child.recycle() }
         }
@@ -94,15 +106,26 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private fun extractDistances(text: String): List<Double> {
-        val regex = Regex("([0-9]+(?:[.,][0-9]+)?)\\s*(?:km|kil[oó]metros?)", RegexOption.IGNORE_CASE)
-        return regex.findAll(text)
-            .mapNotNull { match ->
-                match.groupValues[1].replace(',', '.').toDoubleOrNull()
-                    ?.takeIf { it in 0.0..300.0 }
+        // Accessibility can expose "km" and the number in separate nodes, reverse
+        // their order, or include extra separators. Normalize separators and support
+        // both "4,2 km" and "km 4,2" before falling back to a plain unit match.
+        val normalized = text
+            .replace('·', ' ')
+            .replace('|', ' ')
+            .replace(Regex("\\s+"), " ")
+        val patterns = listOf(
+            Regex("([0-9]+(?:[.,][0-9]+)?)\\s*(?:km\\b|kil[oó]metros?\\b)", RegexOption.IGNORE_CASE),
+            Regex("\\bkm\\s*([0-9]+(?:[.,][0-9]+)?)", RegexOption.IGNORE_CASE)
+        )
+        val found = mutableListOf<Double>()
+        for (pattern in patterns) {
+            pattern.findAll(normalized).forEach { match ->
+                val raw = match.groupValues[1].replace(',', '.')
+                val value = raw.toDoubleOrNull()?.takeIf { it in 0.0..300.0 } ?: return@forEach
+                if (found.none { kotlin.math.abs(it - value) < 0.0001 }) found.add(value)
             }
-            .distinct()
-            .take(2)
-            .toList()
+        }
+        return found.take(2)
     }
 
     private fun showBubble() {
