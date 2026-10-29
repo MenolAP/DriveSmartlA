@@ -444,14 +444,23 @@ class OfferAccessibilityService : AccessibilityService() {
             }
         }, LinearLayout.LayoutParams(0, dp(36), 1f))
         panel.addView(actions)
+        val panelWidth = dp(250)
+        val screenWidth = resources.displayMetrics.widthPixels
+        val bubbleX = bubbleParams?.x ?: dp(12)
+        val bubbleY = bubbleParams?.y ?: dp(220)
+        // Keep the panel to the left of the right-edge bubble so it cannot cover
+        // the very button the user needs to tap again to close it.
+        val panelRightOffset = (bubbleX + dp(116) + dp(8))
+            .coerceIn(0, (screenWidth - panelWidth).coerceAtLeast(0))
         val params = WindowManager.LayoutParams(
-            dp(250), WindowManager.LayoutParams.WRAP_CONTENT,
+            panelWidth, WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            y = dp(110)
+            gravity = Gravity.TOP or Gravity.END
+            x = panelRightOffset
+            y = bubbleY
             softInputMode = android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         }
         panel.setOnTouchListener { _, event ->
